@@ -22,12 +22,12 @@ int main(int argc, char* argv[]) {
     const char* port;
     char buffer[128];
 
-    if (argv[1] != NULL) {
+    if (argc > 1 && argv[1] != NULL) {
         port = argv[1];
     } else {
         port = PORT;
     }
-    if (argv[2] != NULL) {
+    if (argc > 2 && argv[2] != NULL) {
         mode = VERBOSE;
     }
 

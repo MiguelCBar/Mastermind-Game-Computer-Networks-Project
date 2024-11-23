@@ -10,6 +10,7 @@
 
 #define SV_IP "127.0.0.1"
 #define PORT "58001"
+#define PLID_SIZE 6
 
 /*
 bool isSixDigitNumber(const std::string& input) {
@@ -26,7 +27,7 @@ bool isSixDigitNumber(const std::string& input) {
 }
 */
 
-
+/*
 int exit(const char* sv_ip, const char* port) {
     std::cout << "Comando: exit\n";
     std::cout << "sv_ip: " << sv_ip << "\n";
@@ -34,12 +35,73 @@ int exit(const char* sv_ip, const char* port) {
     //mandar msg (UDP) a avisar que vai terminar, caso esteja a meio do jogo
     return 1;
 }
+*/
 
-int  quit(const char* sv_ip, const char* port) {
+int  end_game(const char* sv_ip, const char* port, const char* plid) {
+
+    int fd, errcode;
+    ssize_t n;
+    socklen_t addrlen;
+    struct addrinfo hints, *res;
+    struct sockaddr_in addr;
+    char buffer[256];
+
+
     std::cout << "Comando: quit\n";
     std::cout << "sv_ip: " << sv_ip << "\n";
     std::cout << "port: " << port << "\n";
-    //mandar msg (UDP) a avisar que vai terminar, caso esteja a meio do jogo
+    std::cout << "plid: " << plid << "\n";
+
+    // Create UDP socket
+    fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd == -1) {
+        std::cerr << "Error creating socket\n";
+        return 1;
+    }
+
+    // Prepare the hints structure
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_INET;       // IPv4
+    hints.ai_socktype = SOCK_DGRAM; // UDP socket
+    
+    // Get address info
+    errcode = getaddrinfo(sv_ip, port, &hints, &res);
+    if (errcode != 0) {
+        std::cerr << "Error in getaddrinfo: " << gai_strerror(errcode) << "\n";
+        close(fd);
+        return 1;
+    }
+
+    // traduzir msg para enviar para o server
+    sprintf(buffer, "%s %s\n", "QUT", plid);
+    printf("input: %s\n", buffer);
+
+    // conectar com server
+    n = sendto(fd, buffer, strlen(buffer), 0, res->ai_addr, res->ai_addrlen);
+    if (n == -1) {
+        std::cerr << "Error sending data\n";
+        freeaddrinfo(res);
+        close(fd);
+        return 1;
+    }
+
+    // Receive response
+    addrlen = sizeof(addr);
+    n = recvfrom(fd, buffer, sizeof(buffer), 0, (struct sockaddr*)&addr, &addrlen);
+    if (n == -1) {
+        std::cerr << "Error receiving data\n";
+        freeaddrinfo(res);
+        close(fd);
+        return 1;
+    }
+
+    // Output the received message
+    printf("output: %s\n", buffer);
+
+    // clean up
+    freeaddrinfo(res);
+    close(fd);
+
     return 1;
 }
 
@@ -140,6 +202,8 @@ int try_command(const char* sv_ip, const char* port, const char* c1, const char*
     struct sockaddr_in addr;
     char buffer[256];
 
+    //printf("\n\n\n --------------------------------- plid: %s --------------------\n\n\n", plid);
+
     std::cout << "Comando: try_command\n";
     std::cout << "sv_ip: " << sv_ip << "\n";
     std::cout << "port: " << port << "\n";
@@ -147,6 +211,8 @@ int try_command(const char* sv_ip, const char* port, const char* c1, const char*
     std::cout << "C2: " << c2 << "\n";
     std::cout << "C3: " << c3 << "\n";
     std::cout << "C4: " << c4 << "\n";
+    std::cout << "nT: " << nT << "\n";
+    std::cout << "plid: " << plid << "\n";
 
     // Create UDP socket
     fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -185,6 +251,13 @@ int try_command(const char* sv_ip, const char* port, const char* c1, const char*
 
 int debug_command(const char* sv_ip, const char* port, const char* plid, const char* max_playtime, const char* c1, const char* c2, const char* c3, const char* c4) {
 
+    int fd, errcode;
+    ssize_t n;
+    socklen_t addrlen;
+    struct addrinfo hints, *res;
+    struct sockaddr_in addr;
+    char buffer[256];
+
     std::cout << "Comando: debug_command\n";
     std::cout << "PLID: " << plid << "\n";
     std::cout << "max_playtime: " << max_playtime << "\n";
@@ -193,6 +266,56 @@ int debug_command(const char* sv_ip, const char* port, const char* plid, const c
     std::cout << "C3: " << c3 << "\n";
     std::cout << "C4: " << c4 << "\n";
 
+    // Create UDP socket
+    fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd == -1) {
+        std::cerr << "Error creating socket\n";
+        return 1;
+    }
+
+    // Prepare the hints structure
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_INET;       // IPv4
+    hints.ai_socktype = SOCK_DGRAM; // UDP socket
+    
+    // Get address info
+    errcode = getaddrinfo(sv_ip, port, &hints, &res);
+    if (errcode != 0) {
+        std::cerr << "Error in getaddrinfo: " << gai_strerror(errcode) << "\n";
+        close(fd);
+        return 1;
+    }
+
+    // traduzir msg para enviar para o server
+    sprintf(buffer, "%s %s %s %s %s %s %s\n", "DBG", plid, max_playtime, c1, c2, c3, c4);
+    printf("input: %s\n", buffer);
+
+    // conectar com server
+    n = sendto(fd, buffer, strlen(buffer), 0, res->ai_addr, res->ai_addrlen);
+    if (n == -1) {
+        std::cerr << "Error sending data\n";
+        freeaddrinfo(res);
+        close(fd);
+        return 1;
+    }
+
+    // Receive response
+    addrlen = sizeof(addr);
+    n = recvfrom(fd, buffer, sizeof(buffer), 0, (struct sockaddr*)&addr, &addrlen);
+    if (n == -1) {
+        std::cerr << "Error receiving data\n";
+        freeaddrinfo(res);
+        close(fd);
+        return 1;
+    }
+
+    // Output the received message
+    printf("output: %s\n", buffer);
+
+    // clean up
+    freeaddrinfo(res);
+    close(fd);
+
     return 1;
 }
 
@@ -200,17 +323,16 @@ int debug_command(const char* sv_ip, const char* port, const char* plid, const c
 int main(int argc, char* argv[]) {
 
     int num_args, nT;
-    char *plid;
     const char *sv_ip, *port;
-    char cmd[32], arg1[32], arg2[32], arg3[32], arg4[32], arg5[32], arg6[32];
+    char plid[32], cmd[32], arg1[32], arg2[32], arg3[32], arg4[32], arg5[32], arg6[32];
     std::string input;
 
-    if (argv[1] != NULL) {
+    if (argc > 1 && argv[1] != NULL) {
         sv_ip = argv[1];
     } else {
         sv_ip = SV_IP;
     }
-    if (argv[2] != NULL) {
+    if (argc > 2 && argv[2] != NULL) {
         port = argv[2];
     } else {
         port = PORT;
@@ -227,13 +349,13 @@ int main(int argc, char* argv[]) {
             case 1:
 
                 if (strcmp(cmd, "quit") == 0){
-                    if(!quit(sv_ip, port)){
+                    if(!end_game(sv_ip, port, plid)){
                         return 0; // nao vai haver returns em principio, só se houver erros que seja suposto mandar o programa abaixo
                     }
                 nT = 1;
                 }
                 else if (strcmp(cmd, "exit") == 0){
-                    exit(sv_ip, port);
+                    end_game(sv_ip, port, plid);
                     return 0; //sair do programa
                 }
                 else if (strcmp(cmd, "st") == 0 or strcmp(cmd, "show_trials") == 0) {
@@ -246,6 +368,9 @@ int main(int argc, char* argv[]) {
                         return 0; // nao vai haver returns em principio, só se houver erros que seja suposto mandar o programa abaixo
                     }
                 }
+                else {
+                    printf("comando inválido\n");
+                }
                 break;
 
             case 3:
@@ -253,7 +378,8 @@ int main(int argc, char* argv[]) {
                     return 0; // nao vai haver returns em principio, só se houver erros que seja suposto mandar o programa abaixo
                 }
                 nT = 1;
-                plid = arg1;
+                strncpy(plid, arg1, PLID_SIZE);
+                //printf("plid: %s/n", plid);
                 break;
 
             case 5:
