@@ -8,7 +8,8 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 
-#define PORT "58001"
+
+#define PORT "58058" //58000 + GN, where GN is 58
 #define NOT_VERBOSE 2
 #define VERBOSE 3
 

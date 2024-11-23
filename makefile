@@ -8,7 +8,7 @@ CXXFLAGS = -Wall -std=c++11
 TARGET = player
 
 # The source file to compile
-SRC = player.cpp
+SRC = player_package/player.cpp
 
 # The object file to generate
 OBJ = player.o
