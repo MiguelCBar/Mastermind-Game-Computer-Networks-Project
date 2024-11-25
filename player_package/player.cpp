@@ -1,4 +1,13 @@
-#include "commands.cpp"
+#include <iostream>
+#include <cstring>
+
+#include "commands.h"
+
+#define SV_IP "127.0.0.1"
+#define PORT "58058" //58000 + GN, where GN is 58
+#define PLID_SIZE 6
+
+#include "commands.h"
 
 int main(int argc, char* argv[]) {
 
@@ -48,7 +57,7 @@ int main(int argc, char* argv[]) {
     }
     while(true) {
         //le comando
-        std::cout << "comando: ";
+        std::cout << "Command: ";
         std::getline(std::cin, input); // Captura a entrada do terminal como string
 
         num_args = sscanf(input.c_str(), "%s %s %s %s %s %s %s", cmd, arg1, arg2, arg3, arg4, arg5, arg6);

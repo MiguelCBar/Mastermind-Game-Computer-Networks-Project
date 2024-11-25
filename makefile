@@ -1,32 +1,44 @@
-# The compiler to use
+# Compiler
 CXX = g++
 
 # Compiler flags
 CXXFLAGS = -Wall -std=c++11
 
-# The name of the output executable
-TARGET = player
+# Executable names
+TARGETS = player GS
 
-# The source file to compile
-SRC = player_package/player.cpp
+# Source files for each executable
+PLAYER_SRC = player_package/player.cpp player_package/commands.cpp
+GS_SRC = server/GS.cpp
 
-# The object file to generate
-OBJ = player.o
+# Object files for each executable
+PLAYER_OBJ = player_package/player.o player_package/commands.o
+GS_OBJ = server/GS.o
 
-# The default rule to compile the target
-all: $(TARGET)
+# Default target to build all executables
+all: $(TARGETS)
 
-# Linking the object file to create the executable
-$(TARGET): $(OBJ)
-	$(CXX) $(OBJ) -o $(TARGET)
+# Rule to build the 'player' executable
+player: $(PLAYER_OBJ)
+	$(CXX) $(PLAYER_OBJ) -o player
 
-# Rule to compile the source file into an object file
-$(OBJ): $(SRC)
-	$(CXX) $(CXXFLAGS) -c $(SRC)
+# Rule to build the 'GS' executable
+GS: $(GS_OBJ)
+	$(CXX) $(GS_OBJ) -o GS
+
+# Rules to compile source files into object files
+player.o: player_package/player.cpp
+	$(CXX) $(CXXFLAGS) -c player_package/player.cpp -o player.o
+
+commands.o: player_package/commands.cpp
+	$(CXX) $(CXXFLAGS) -c player_package/commands.cpp -o commands.o
+
+GS.o: server/GS.cpp
+	$(CXX) $(CXXFLAGS) -c server/GS.cpp -o GS.o
 
 # Clean up generated files
 clean:
-	rm -f $(OBJ) $(TARGET)
+	rm -f $(PLAYER_OBJ) $(GS_OBJ) $(TARGETS)
 
-# Optional: to remove backup or temporary files
-.PHONY: clean
+# Specify phony targets
+.PHONY: all clean

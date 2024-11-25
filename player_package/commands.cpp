@@ -8,6 +8,8 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 
+#include "commands.h"
+
 #define SV_IP "127.0.0.1"
 #define PORT "58058" //58000 + GN, where GN is 58
 #define PLID_SIZE 6
@@ -37,7 +39,7 @@ int exit(const char* sv_ip, const char* port) {
 }
 */
 
-int  end_game(const char* sv_ip, const char* port, const char* plid) {
+int end_game(const char* sv_ip, const char* port, const char* plid) {
 
     int fd, errcode;
     ssize_t n;
@@ -106,10 +108,65 @@ int  end_game(const char* sv_ip, const char* port, const char* plid) {
 }
 
 int show_trials(const char* sv_ip, const char* port) {
-    std::cout << "Comando: show_trials\n";
+/*     std::cout << "Comando: show_trials\n";
     std::cout << "sv_ip: " << sv_ip << "\n";
-    std::cout << "port: " << port << "\n";
-    // mostrar trials (TCP)
+    std::cout << "port: " << port << "\n"; */
+
+    int fd, errcode;
+    ssize_t n;
+    socklen_t addrlen;
+    struct addrinfo hints, *res;
+    struct sockaddr_in addr;
+    char buffer[128];
+
+    // Create the socket
+    fd = socket(AF_INET, SOCK_STREAM, 0); // TCP socket
+    if (fd == -1) {
+        perror("socket");
+        exit(1);
+    }
+
+    // Set up the hints for getaddrinfo
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;        // IPv4
+    hints.ai_socktype = SOCK_STREAM; // TCP socket
+
+    // Get address info
+    errcode = getaddrinfo(sv_ip, port, &hints, &res);
+    if (errcode != 0) {
+        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(errcode));
+        exit(1);
+    }
+
+    // Connect to the server
+    n = connect(fd, res->ai_addr, res->ai_addrlen);
+    if (n == -1) {
+        perror("connect");
+        exit(1);
+    }
+
+    // Write to the server
+    n = write(fd, "Hello!\n", 7);
+    if (n == -1) {
+        perror("write");
+        exit(1);
+    }
+
+    // Read response from the server
+    n = read(fd, buffer, 128);
+    if (n == -1) {
+        perror("read");
+        exit(1);
+    }
+
+    // Print the response
+    write(1, "echo: ", 6);
+    write(1, buffer, n);
+
+    // Clean up
+    freeaddrinfo(res);
+    close(fd);
+
     return 1;
 }
 
