@@ -32,14 +32,41 @@ void generateColorCode(char* color_code) {
 }
 
 
-int startGame(const char* plid, const char* max_playtime, const char* mode) {
+int startGame(const char* plid, const char* max_playtime, const char* mode, const char* c1, const char* c2, const char* c3, const char* c4) {
 
     time_t fulltime;                                         
     struct tm* currentTime;
     char first_file_line[128], file_name[64], time_str[20];
     char color_code[5]; // 4 chars + null terminator
 
-    generateColorCode(color_code);
+    // File name
+    sprintf(file_name, "./server/GAMES/GAME_%s.txt", plid);
+
+    // Tenta abrir o arquivo no modo de leitura
+    FILE* file = fopen(file_name, "r");
+    if (file) {
+        char existing_plid[6];
+        // Arquivo existe; verificar o `plid`
+        if (fscanf(file, "%s", existing_plid) == 1) {
+            if (strcmp(existing_plid, plid) == 0) {
+                // game with plid already on course, close arquive and return
+                fclose(file);
+                printf("Game on course with same PLID: %s\n", existing_plid);
+                return 0; // Ou um código específico para indicar que não foi criado
+            }
+        }
+        fclose(file);
+    }   // file doesnt exist, start a new game
+
+    //memset(color_code, 0, sizeof(color_code));
+
+    if (strcmp(mode, "P") == 0) {
+        generateColorCode(color_code);
+    }
+    else {
+        sprintf(color_code, "%s%s%s%s", c1, c2, c3, c4);
+    }
+    //printf(" ------------------- color code: %s\n", color_code);
 
     time(&fulltime);            // Current time in seconds since 1970
     currentTime = gmtime(&fulltime);
@@ -49,26 +76,22 @@ int startGame(const char* plid, const char* max_playtime, const char* mode) {
     sprintf(time_str, "%04d-%02d-%02d %02d:%02d:%02d",
              currentTime->tm_year + 1900, currentTime->tm_mon + 1, currentTime->tm_mday,
              currentTime->tm_hour, currentTime->tm_min, currentTime->tm_sec);
-
-    //File name
-    sprintf(file_name, "./server/GAMES/GAME_%s.txt", plid);
-    printf("%s\n",file_name);
-
-    // First line of the file
-    sprintf(first_file_line, "%s %s %s %s %s %ld", plid, mode, color_code, max_playtime, time_str, momentoInicio);
     
-    // Open the file or create it, if it doesn't exist
-    FILE* file = fopen(file_name, "w");
+    // Create the file
+    file = fopen(file_name, "w");
     if (!file) {
         perror("Erro ao criar ficheiro");
         return -1;
     }
-    // Escrever a primeira linha no ficheiro
+
+    // First line of the file
+    sprintf(first_file_line, "%s %s %s %s %s %ld", plid, mode, color_code, max_playtime, time_str, momentoInicio);
     fprintf(file, "%s\n", first_file_line);
+
     // Close the file
     fclose(file);
     
-    return 0;
+    return 1;
 }
 
 
@@ -83,12 +106,21 @@ int resolveUDPCommands(const char* input, char* response_buffer) {
 
         case 3:
             if (strcmp(cmd, "SNG") == 0){
-                if(!startGame(arg1, arg2, "P")){
+                if(!startGame(arg1, arg2, "P", arg3, arg4, arg5, arg6)){
                     return 0; // nao vai haver returns em principio, só se houver erros que seja suposto mandar o programa abaixo
                 }
             }
             break;
+
+        case 7:
+            if (strcmp(cmd, "DBG") == 0){
+                if(!startGame(arg1, arg2, "D", arg3, arg4, arg5, arg6)){
+                    return 0; // nao vai haver returns em principio, só se houver erros que seja suposto mandar o programa abaixo
+                }
+            }
+            break;            
     }
+    return 0;
 }
 
 
@@ -205,7 +237,7 @@ int main(int argc, char* argv[]) {
                     // Exibir a mensagem recebida
                     write(1, "received: ", 10);
                     write(1, buffer, n);
-                    char* response_buffer;
+                    char response_buffer[128];
                     resolveUDPCommands(buffer, response_buffer);
                     
 
@@ -249,9 +281,6 @@ int main(int argc, char* argv[]) {
 
 }
 
-
-
-    
 
 
     /* // Associar socket ao endereço
