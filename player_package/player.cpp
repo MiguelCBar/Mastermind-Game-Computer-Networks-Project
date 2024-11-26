@@ -60,7 +60,7 @@ int main(int argc, char* argv[]) {
         std::cout << "Command: ";
         std::getline(std::cin, input); // Captura a entrada do terminal como string
 
-        num_args = sscanf(input.c_str(), "%s %s %s %s %s %s %s", cmd, arg1, arg2, arg3, arg4, arg5, arg6);
+        num_args = sscanf(input.c_str(), "%s %s %s %s %s %s %s\n", cmd, arg1, arg2, arg3, arg4, arg5, arg6);
 
         switch (num_args) {
             case 1:

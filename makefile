@@ -40,5 +40,8 @@ GS.o: server/GS.cpp
 clean:
 	rm -f $(PLAYER_OBJ) $(GS_OBJ) $(TARGETS)
 
+lclean:
+	rm -f $(PLAYER_OBJ) $(GS_OBJ) $(TARGETS) *.txt
+
 # Specify phony targets
 .PHONY: all clean

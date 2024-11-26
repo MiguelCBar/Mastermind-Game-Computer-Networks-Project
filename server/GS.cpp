@@ -8,13 +8,91 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 
+#include <fstream>
+#include <ctime>
+#include <iomanip>
+
 
 #define PORT "58058" //58000 + GN, where GN is 58
 #define NOT_VERBOSE 2
 #define VERBOSE 3
+#define COLOR_NUMBER 6
 
 
 //provavelmente, falta mais close(tcp_socket) e close(udp_socket), nos erros
+
+
+// Gera um código de cores no formato "RRRR"
+void generateColorCode(char* color_code) {
+    const char colors[] = "RGBY";
+    for (int i = 0; i < 4; i++) {
+        color_code[i] = colors[rand() % 4];
+    }
+    color_code[4] = '\0'; // Add the '\0' character
+}
+
+
+int startGame(const char* plid, const char* max_playtime, const char* mode) {
+
+    time_t fulltime;                                         
+    struct tm* currentTime;
+    char first_file_line[128], file_name[64], time_str[20];
+    char color_code[5]; // 4 chars + null terminator
+
+    generateColorCode(color_code);
+
+    time(&fulltime);            // Current time in seconds since 1970
+    currentTime = gmtime(&fulltime);
+
+    long momentoInicio = fulltime;  // Time in seconds sin 1970
+
+    sprintf(time_str, "%04d-%02d-%02d %02d:%02d:%02d",
+             currentTime->tm_year + 1900, currentTime->tm_mon + 1, currentTime->tm_mday,
+             currentTime->tm_hour, currentTime->tm_min, currentTime->tm_sec);
+
+    //File name
+    sprintf(file_name, "./server/GAMES/GAME_%s.txt", plid);
+    printf("%s\n",file_name);
+
+    // First line of the file
+    sprintf(first_file_line, "%s %s %s %s %s %ld", plid, mode, color_code, max_playtime, time_str, momentoInicio);
+    
+    // Open the file or create it, if it doesn't exist
+    FILE* file = fopen(file_name, "w");
+    if (!file) {
+        perror("Erro ao criar ficheiro");
+        return -1;
+    }
+    // Escrever a primeira linha no ficheiro
+    fprintf(file, "%s\n", first_file_line);
+    // Close the file
+    fclose(file);
+    
+    return 0;
+}
+
+
+int resolveUDPCommands(const char* input, char* response_buffer) {
+
+    int num_args;
+    char plid[32], cmd[32], arg1[32], arg2[32], arg3[32], arg4[32], arg5[32], arg6[32];
+
+    num_args = sscanf(input, "%s %s %s %s %s %s %s\n", cmd, arg1, arg2, arg3, arg4, arg5, arg6);
+
+    switch(num_args) {
+
+        case 3:
+            if (strcmp(cmd, "SNG") == 0){
+                if(!startGame(arg1, arg2, "P")){
+                    return 0; // nao vai haver returns em principio, só se houver erros que seja suposto mandar o programa abaixo
+                }
+            }
+            break;
+    }
+}
+
+
+
 
 int main(int argc, char* argv[]) {
 
@@ -27,7 +105,7 @@ int main(int argc, char* argv[]) {
 
     int out_fds;
     struct timeval timeout;
-    fd_set fd_sockets, test_fd_sockets;
+    fd_set fd_sockets;
 
     if (argc > 1 && argv[1] != NULL) {
         port = argv[1];
@@ -105,17 +183,17 @@ int main(int argc, char* argv[]) {
     FD_SET(tcp_socket, &fd_sockets);
 
     while(true) {
-        test_fd_sockets = fd_sockets; //o select altera o fd_sockets, por isso temos de enviar uma cópia
+        fd_set test_fd_sockets = fd_sockets; //o select altera o fd_sockets, por isso temos de enviar uma cópia
         memset((void*)&timeout, 0, sizeof(timeout)); //not sure se é preciso timeout, mas estava no ficheiro do stor
         timeout.tv_sec = 10;
         out_fds = select(FD_SETSIZE, &test_fd_sockets, (fd_set*) NULL, (fd_set*)NULL, (struct timeval*) &timeout);
         switch(out_fds) {
-            case 0:
-                printf("TIMEOUT\n");
-                break;
             case -1:
                 perror("Error in Select function");
                 exit(1);
+            case 0:
+                printf("TIMEOUT\n");
+                break;
             default:
                 addrlen = sizeof(addr);
                 if(FD_ISSET(udp_socket, &test_fd_sockets)) {
@@ -124,10 +202,12 @@ int main(int argc, char* argv[]) {
                         perror("recvfrom");
                         exit(1);
                     }
-
                     // Exibir a mensagem recebida
                     write(1, "received: ", 10);
                     write(1, buffer, n);
+                    char* response_buffer;
+                    resolveUDPCommands(buffer, response_buffer);
+                    
 
                     // Enviar resposta para o cliente
                     if (sendto(udp_socket, buffer, n, 0, (struct sockaddr*)&addr, addrlen) == -1) {
@@ -140,6 +220,7 @@ int main(int argc, char* argv[]) {
                     int new_fd = accept(tcp_socket, (struct sockaddr*) &addr, &addrlen);
                     if(new_fd == -1) {
                         perror("TCP Socket accept error");
+
                         exit(1);
                     }
                     n = read(new_fd, buffer, 128);
