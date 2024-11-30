@@ -185,14 +185,16 @@ int start_game(const char* sv_ip, const char* port, const char* plid, const char
     socklen_t addrlen;
     struct addrinfo hints, *res;
     struct sockaddr_in addr;
-    char buffer[256];
+    char buffer[256], output_buffer[256];
 
+    /*
     // printar argumentos para confirmar
     std::cout << "Comando: start_game\n";
     std::cout << "sv_ip: " << sv_ip << "\n";
     std::cout << "port: " << port << "\n";
     std::cout << "PLID: " << plid << "\n";
     std::cout << "max_playtime: " << max_playtime << "\n";
+    */
 
     // Create UDP socket
     fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -214,9 +216,10 @@ int start_game(const char* sv_ip, const char* port, const char* plid, const char
         return 1;
     }
 
+    memset(buffer, 0, sizeof(buffer));
     // traduzir msg para enviar para o server
     sprintf(buffer, "%s %s %s\n", "SNG", plid, max_playtime);
-    printf("input: %s\n", buffer);
+    printf("input buffer: %s\n", buffer);
 
     // conectar com server
     n = sendto(fd, buffer, strlen(buffer), 0, res->ai_addr, res->ai_addrlen);
@@ -226,11 +229,13 @@ int start_game(const char* sv_ip, const char* port, const char* plid, const char
         close(fd);
         return 1;
     }
-
     
     // Receive response
     addrlen = sizeof(addr);
-    n = recvfrom(fd, buffer, sizeof(buffer), 0, (struct sockaddr*)&addr, &addrlen);
+
+    memset(output_buffer, 0, sizeof(output_buffer));
+    n = recvfrom(fd, output_buffer, sizeof(output_buffer), 0, (struct sockaddr*)&addr, &addrlen);
+    
     if (n == -1) {
         std::cerr << "Error receiving data\n";
         freeaddrinfo(res);
@@ -240,7 +245,7 @@ int start_game(const char* sv_ip, const char* port, const char* plid, const char
 
     // Output the received message
     //std::cout << "echo: " << std::string(buffer, n) << "\n";
-    printf("output: %s\n", buffer);
+    printf("output: %s\n", output_buffer);
 
     // clean up
     freeaddrinfo(res);
@@ -257,10 +262,11 @@ int try_command(const char* sv_ip, const char* port, const char* c1, const char*
     socklen_t addrlen;
     struct addrinfo hints, *res;
     struct sockaddr_in addr;
-    char buffer[256];
+    char buffer[256], output_buffer[256];
 
     //printf("\n\n\n --------------------------------- plid: %s --------------------\n\n\n", plid);
 
+    /*
     std::cout << "Comando: try_command\n";
     std::cout << "sv_ip: " << sv_ip << "\n";
     std::cout << "port: " << port << "\n";
@@ -270,6 +276,7 @@ int try_command(const char* sv_ip, const char* port, const char* c1, const char*
     std::cout << "C4: " << c4 << "\n";
     std::cout << "nT: " << nT << "\n";
     std::cout << "plid: " << plid << "\n";
+    */
 
     // Create UDP socket
     fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -291,10 +298,11 @@ int try_command(const char* sv_ip, const char* port, const char* c1, const char*
         return 1;
     }
 
+    memset(buffer, 0, sizeof(buffer));
     // traduzir msg para enviar para o server (plid precisam ser substituidos pelos valores corretos)
     sprintf(buffer, "%s %s %s %s %s %s %d\n", "TRY", plid, c1, c2, c3, c4, nT);
 
-    printf("input: %s\n", buffer);
+    printf("input buffer enviado: %s\n", buffer);
 
     // conectar com server
     n = sendto(fd, buffer, strlen(buffer), 0, res->ai_addr, res->ai_addrlen);
@@ -303,6 +311,24 @@ int try_command(const char* sv_ip, const char* port, const char* c1, const char*
         freeaddrinfo(res);
         close(fd);
     }
+
+    // Receive response
+    addrlen = sizeof(addr);
+    memset(output_buffer, 0, sizeof(output_buffer));
+    n = recvfrom(fd, output_buffer, sizeof(output_buffer), 0, (struct sockaddr*)&addr, &addrlen);
+    if (n == -1) {
+        std::cerr << "Error receiving data\n";
+        freeaddrinfo(res);
+        close(fd);
+        return 1;
+    }
+    // Output the received message
+    //std::cout << "echo: " << std::string(buffer, n) << "\n";
+    printf("output: %s\n", output_buffer);
+
+    // clean up
+    freeaddrinfo(res);
+    close(fd);
     return 1;
 }
 

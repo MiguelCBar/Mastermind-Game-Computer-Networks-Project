@@ -13,8 +13,6 @@ int main(int argc, char* argv[]) {
 
     int num_args, nT;
     const char *sv_ip, *port;
-    char plid[32], cmd[32], arg1[32], arg2[32], arg3[32], arg4[32], arg5[32], arg6[32];
-    std::string input;
 
     /* if (argc > 1 && argv[1] != NULL) {
         sv_ip = argv[1];
@@ -56,12 +54,14 @@ int main(int argc, char* argv[]) {
         exit(1);
     }
     while(true) {
+
+        std::string input;
+        char plid[32], cmd[32], arg1[32], arg2[32], arg3[32], arg4[32], arg5[32], arg6[32];
         //le comando
         std::cout << "Command: ";
         std::getline(std::cin, input); // Captura a entrada do terminal como string
 
         num_args = sscanf(input.c_str(), "%s %s %s %s %s %s %s\n", cmd, arg1, arg2, arg3, arg4, arg5, arg6);
-
         switch (num_args) {
             case 1:
 
