@@ -14,8 +14,7 @@
 #define PORT "58058" //58000 + GN, where GN is 58
 #define PLID_SIZE 6
 
-/*
-bool isSixDigitNumber(const std::string& input) {
+bool verifyPLID(const std::string& input) {
     // Verifica se tem exatamente 6 caracteres e todos são dígitos
     if (input.length() == 6) {
         for (char c : input) {
@@ -27,32 +26,37 @@ bool isSixDigitNumber(const std::string& input) {
     }
     return false;
 }
-*/
 
-/*
-int exit(const char* sv_ip, const char* port) {
-    std::cout << "Comando: exit\n";
-    std::cout << "sv_ip: " << sv_ip << "\n";
-    std::cout << "port: " << port << "\n";
-    //mandar msg (UDP) a avisar que vai terminar, caso esteja a meio do jogo
-    return 1;
+bool verifyMaxPlaytime(const std::string& input) {
+    if(input.length() <= 3) {
+        for(char c : input) {
+            if(!std::isdigit(c)) {
+                return false;
+            }
+        }
+        if(std::stoi(input) > 600)
+            return false;
+        return true;
+    }
+    return false;
 }
-*/
+
+
+bool verifyColor(const std::string& color) {
+    std::string validColors = "RGBYOP";
+    return color.length() == 1 && validColors.find(color) != std::string::npos;
+}
+
 
 int end_game(const char* sv_ip, const char* port, const char* plid) {
 
-    int fd, errcode;
+    int fd, errcode, num_args;
     ssize_t n;
     socklen_t addrlen;
     struct addrinfo hints, *res;
     struct sockaddr_in addr;
-    char buffer[256];
-
-
-    std::cout << "Comando: quit\n";
-    std::cout << "sv_ip: " << sv_ip << "\n";
-    std::cout << "port: " << port << "\n";
-    std::cout << "plid: " << plid << "\n";
+    char request_buffer[256], response_buffer[256];
+    char cmd[32], status[32], arg1[32], arg2[32], arg3[32], arg4[32];
 
     // Create UDP socket
     fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -74,12 +78,11 @@ int end_game(const char* sv_ip, const char* port, const char* plid) {
         return 1;
     }
 
-    // traduzir msg para enviar para o server
-    sprintf(buffer, "%s %s\n", "QUT", plid);
-    printf("input: %s\n", buffer);
+    memset(request_buffer, 0, sizeof(request_buffer));
+    sprintf(request_buffer, "%s %s\n", "QUT", plid);
 
     // conectar com server
-    n = sendto(fd, buffer, strlen(buffer), 0, res->ai_addr, res->ai_addrlen);
+    n = sendto(fd, request_buffer, strlen(request_buffer), 0, res->ai_addr, res->ai_addrlen);
     if (n == -1) {
         std::cerr << "Error sending data\n";
         freeaddrinfo(res);
@@ -89,17 +92,46 @@ int end_game(const char* sv_ip, const char* port, const char* plid) {
 
     // Receive response
     addrlen = sizeof(addr);
-    n = recvfrom(fd, buffer, sizeof(buffer), 0, (struct sockaddr*)&addr, &addrlen);
+    memset(response_buffer, 0, sizeof(response_buffer));
+    n = recvfrom(fd, response_buffer, sizeof(response_buffer), 0, (struct sockaddr*)&addr, &addrlen);
     if (n == -1) {
         std::cerr << "Error receiving data\n";
         freeaddrinfo(res);
         close(fd);
         return 1;
     }
+    num_args = sscanf(response_buffer, "%s %s %s %s %s %s\n", cmd, status, arg1, arg2, arg3, arg4);
 
-    // Output the received message
-    printf("output: %s\n", buffer);
-
+    if(strcmp(cmd, "RQT")) {
+        std::cerr << "Communication error.\n";
+        freeaddrinfo(res);
+        close(fd);
+        return 1;
+    }
+    switch (num_args){
+        case 2:
+            if(!strcmp(status, "NOK")) {
+                std::cout << "Player does not have an ongoing game.\n";
+            }
+            else if(!strcmp(status, "ERR")) {
+                std::cout << "Something went wrong.\n";
+            }
+            else {
+                std::cerr << "Communication error.\n";
+            }
+            break;
+        case 6:
+            if(!strcmp(status, "OK")) {
+                std::cout << "Game terminated. The color code was:\n\t### " << arg1 << " " << arg2 << " " << arg3 << " " << arg4 << " ###\n";
+            }
+            else {
+                std::cerr << "Communication error.\n";
+            }
+            break;
+        default:
+            std::cerr << "Communication error.\n";
+            break;
+    }
     // clean up
     freeaddrinfo(res);
     close(fd);
@@ -180,27 +212,28 @@ int scoreboard(const char* sv_ip, const char* port) {
 
 int start_game(const char* sv_ip, const char* port, const char* plid, const char* max_playtime) {
 
-    int fd, errcode;
+    int fd, errcode, num_args;
     ssize_t n;
     socklen_t addrlen;
     struct addrinfo hints, *res;
     struct sockaddr_in addr;
-    char buffer[256], output_buffer[256];
+    char request_buffer[256], response_buffer[256];
+    char cmd[32], status[32];
 
-    /*
-    // printar argumentos para confirmar
-    std::cout << "Comando: start_game\n";
-    std::cout << "sv_ip: " << sv_ip << "\n";
-    std::cout << "port: " << port << "\n";
-    std::cout << "PLID: " << plid << "\n";
-    std::cout << "max_playtime: " << max_playtime << "\n";
-    */
+    if(!verifyPLID(plid)) {
+        std::cerr << "Invalid PLID. Variable must be six digits long.\n";
+        return 0;
+    }
 
+    if(!verifyMaxPlaytime(max_playtime)) {
+        std::cerr << "Invalid Max Playtime. Variable must be less than 600 seconds.\n";
+        return 0;
+    }
     // Create UDP socket
     fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (fd == -1) {
         std::cerr << "Error creating socket\n";
-        return 1;
+        return 0;
     }
 
     // Prepare the hints structure
@@ -213,39 +246,62 @@ int start_game(const char* sv_ip, const char* port, const char* plid, const char
     if (errcode != 0) {
         std::cerr << "Error in getaddrinfo: " << gai_strerror(errcode) << "\n";
         close(fd);
-        return 1;
+        return 0;
     }
 
-    memset(buffer, 0, sizeof(buffer));
+    memset(request_buffer, 0, sizeof(request_buffer));
     // traduzir msg para enviar para o server
-    sprintf(buffer, "%s %s %s\n", "SNG", plid, max_playtime);
-    printf("input buffer: %s\n", buffer);
+    sprintf(request_buffer, "%s %s %s\n", "SNG", plid, max_playtime);
 
     // conectar com server
-    n = sendto(fd, buffer, strlen(buffer), 0, res->ai_addr, res->ai_addrlen);
+    n = sendto(fd, request_buffer, strlen(request_buffer), 0, res->ai_addr, res->ai_addrlen);
     if (n == -1) {
         std::cerr << "Error sending data\n";
         freeaddrinfo(res);
         close(fd);
-        return 1;
+        return 0;
     }
     
     // Receive response
     addrlen = sizeof(addr);
 
-    memset(output_buffer, 0, sizeof(output_buffer));
-    n = recvfrom(fd, output_buffer, sizeof(output_buffer), 0, (struct sockaddr*)&addr, &addrlen);
-    
+    memset(response_buffer, 0, sizeof(response_buffer));
+    n = recvfrom(fd, response_buffer, sizeof(response_buffer), 0, (struct sockaddr*)&addr, &addrlen);
     if (n == -1) {
         std::cerr << "Error receiving data\n";
         freeaddrinfo(res);
         close(fd);
-        return 1;
+        return 0;
     }
 
-    // Output the received message
-    //std::cout << "echo: " << std::string(buffer, n) << "\n";
-    printf("output: %s\n", output_buffer);
+    num_args = sscanf(response_buffer, "%s %s\n", cmd, status);
+
+    if(strcmp(cmd, "RSG")) {
+        std::cerr << "Communication error.\n";
+        freeaddrinfo(res);
+        close(fd);
+        return 1;
+    }
+    
+    switch (num_args){
+        case 2:
+            if(!strcmp(status, "NOK")) {
+                std::cout << "Player " << plid << " already has an ongoing game.\n";
+            }
+            else if(!strcmp(status, "OK")) {
+                std::cout << "New game started (max " << max_playtime <<" sec).\n";
+            }
+            else if(!!strcmp(status, "ERR")) {
+                std::cout << "Something is not right. Probably player PLID is invalid, time is over 600 seconds or the syntax of the \"SNG\" is incorrect\n.";
+            }
+            else {
+                std::cerr << "Communication error.\n";
+            }
+            break;
+        default:
+            std::cerr << "Communication error.\n";
+            break;
+    }
 
     // clean up
     freeaddrinfo(res);
@@ -254,29 +310,30 @@ int start_game(const char* sv_ip, const char* port, const char* plid, const char
     return 1;
 }
 
-int try_command(const char* sv_ip, const char* port, const char* c1, const char* c2, const char* c3, const char* c4, int nT, const char* plid) {
+int try_command(const char* sv_ip, const char* port, const char* c1, const char* c2, const char* c3, const char* c4, int* nT, const char* plid) {
 
 
     int fd, errcode;
     ssize_t n;
+    int num_args;
     socklen_t addrlen;
     struct addrinfo hints, *res;
     struct sockaddr_in addr;
-    char buffer[256], output_buffer[256];
+    char request_buffer[256], response_buffer[256];
+    char cmd[32], status[32], arg1[32], arg2[32], arg3[32], arg4[32];
 
-    //printf("\n\n\n --------------------------------- plid: %s --------------------\n\n\n", plid);
 
-    /*
-    std::cout << "Comando: try_command\n";
-    std::cout << "sv_ip: " << sv_ip << "\n";
-    std::cout << "port: " << port << "\n";
-    std::cout << "C1: " << c1 << "\n";
-    std::cout << "C2: " << c2 << "\n";
-    std::cout << "C3: " << c3 << "\n";
-    std::cout << "C4: " << c4 << "\n";
-    std::cout << "nT: " << nT << "\n";
-    std::cout << "plid: " << plid << "\n";
-    */
+    if(!verifyPLID(plid)) {
+        std::cerr << "Invalid PLID. Variable must be six digits long.\n";
+        return 0;
+    }
+
+    if(!verifyColor(c1) && !verifyColor(c2) && !verifyColor(c3) && !verifyColor(c4)) {
+        std::cerr << "Incorrect color Code. Possible colors are:\nR -> Red\nG -> Green\nB -> Blue\nY -> Yellow\nO -> Orange\nP -> purple\n";
+        return 0;
+    }
+    
+
 
     // Create UDP socket
     fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -298,14 +355,12 @@ int try_command(const char* sv_ip, const char* port, const char* c1, const char*
         return 1;
     }
 
-    memset(buffer, 0, sizeof(buffer));
+    memset(request_buffer, 0, sizeof(request_buffer));
     // traduzir msg para enviar para o server (plid precisam ser substituidos pelos valores corretos)
-    sprintf(buffer, "%s %s %s %s %s %s %d\n", "TRY", plid, c1, c2, c3, c4, nT);
+    sprintf(request_buffer, "%s %s %s %s %s %s %d\n", "TRY", plid, c1, c2, c3, c4, *nT);
 
-    printf("input buffer enviado: %s\n", buffer);
-
-    // conectar com server
-    n = sendto(fd, buffer, strlen(buffer), 0, res->ai_addr, res->ai_addrlen);
+    // connect with the server
+    n = sendto(fd, request_buffer, strlen(request_buffer), 0, res->ai_addr, res->ai_addrlen);
     if (n == -1) {
         std::cerr << "Error sending data\n";
         freeaddrinfo(res);
@@ -314,17 +369,73 @@ int try_command(const char* sv_ip, const char* port, const char* c1, const char*
 
     // Receive response
     addrlen = sizeof(addr);
-    memset(output_buffer, 0, sizeof(output_buffer));
-    n = recvfrom(fd, output_buffer, sizeof(output_buffer), 0, (struct sockaddr*)&addr, &addrlen);
+    memset(response_buffer, 0, sizeof(response_buffer));
+    n = recvfrom(fd, response_buffer, sizeof(response_buffer), 0, (struct sockaddr*)&addr, &addrlen);
     if (n == -1) {
         std::cerr << "Error receiving data\n";
         freeaddrinfo(res);
         close(fd);
         return 1;
     }
-    // Output the received message
-    //std::cout << "echo: " << std::string(buffer, n) << "\n";
-    printf("output: %s\n", output_buffer);
+
+    num_args = sscanf(response_buffer, "%s %s %s %s %s %s\n", cmd, status, arg1, arg2, arg3, arg4);
+
+    if(strcmp(cmd, "RTR")) {
+        std::cerr << "Communication error.\n";
+        freeaddrinfo(res);
+        close(fd);
+        return 1;
+    }
+    
+    switch (num_args){
+        case 2:
+            if(!strcmp(status, "DUP")) {
+                std::cout << "You already tried this color code. Number of trials not increased.\n";
+            }
+            else if(!strcmp(status, "INV")) {
+                std::cerr << "Wrong trial number.\n";
+            }
+            else if(!strcmp(status, "NOK")) {
+                std::cerr << "Something is not right, probably player " << plid << " does not have an ongoing game.\n";
+            }
+            else if(!strcmp(status, "ERR")) {
+                std::cerr << "Invalid syntax. Either PLID or color code is not allowed.\n";
+            }
+            else {
+                std::cerr << "Communication error.\n";
+            }
+            break;
+
+        case 5:
+            if(!strcmp(status, "OK")) {
+                if (!strcmp(arg2, "4")) {
+                    
+                    std::cout << "Congratulations!! You correctly guessed the secret color code in " << arg1 << "trials\n";
+                }
+                else {
+                    std::cout << "nB: " << arg2 << "\tnW: " << arg3 << "\n"; // meter numero de trials
+                    (*nT)++;
+                }
+            }
+            else {
+                std::cerr << "Communication error.\n";
+            }
+            break;
+        case 6:
+            if(!strcmp(status, "ENT")) {
+                std::cout << "Limit of trials reached. The correct color code was:\n\t\t### " << arg1 << " " << arg2 << " " << arg3 << " " << arg4 << " ###\n";
+            }
+            else if(!strcmp(status, "ETM")) {
+                std::cout << "Maximum play time exceeded. The correct color code was:\n\t\t### " << arg1 << " " << arg2 << " " << arg3 << " " << arg4 << " ###\n";
+            }
+            else {
+                std::cerr << "Communication error.\n";
+            }
+            break;
+        default:
+            std::cerr << "Communication error.\n";
+            break;
+    }
 
     // clean up
     freeaddrinfo(res);
@@ -334,20 +445,26 @@ int try_command(const char* sv_ip, const char* port, const char* c1, const char*
 
 int debug_command(const char* sv_ip, const char* port, const char* plid, const char* max_playtime, const char* c1, const char* c2, const char* c3, const char* c4) {
 
-    int fd, errcode;
+    int fd, errcode, num_args;
     ssize_t n;
     socklen_t addrlen;
     struct addrinfo hints, *res;
     struct sockaddr_in addr;
-    char buffer[256];
+    char request_buffer[256], response_buffer[256];
+    char cmd[32], status[32];
 
-    std::cout << "Comando: debug_command\n";
-    std::cout << "PLID: " << plid << "\n";
-    std::cout << "max_playtime: " << max_playtime << "\n";
-    std::cout << "C1: " << c1 << "\n";
-    std::cout << "C2: " << c2 << "\n";
-    std::cout << "C3: " << c3 << "\n";
-    std::cout << "C4: " << c4 << "\n";
+    if(!verifyPLID(plid)) {
+        std::cerr << "Invalid PLID. Variable must be six digits long.\n";
+        return 0;
+    }
+    if(!verifyMaxPlaytime(max_playtime)) {
+        std::cerr << "Invalid Max Playtime. Variable must be less than 600 seconds.\n";
+        return 0;
+    }
+    if(!verifyColor(c1) || !verifyColor(c2) || !verifyColor(c3) || !verifyColor(c4)) {
+        std::cerr << "Incorrect color Code. Possible colors are:\nR -> Red\nG -> Green\nB -> Blue\nY -> Yellow\nO -> Orange\nP -> purple\n";
+        return 0;
+    }
 
     // Create UDP socket
     fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -369,12 +486,11 @@ int debug_command(const char* sv_ip, const char* port, const char* plid, const c
         return 1;
     }
 
-    // traduzir msg para enviar para o server
-    sprintf(buffer, "%s %s %s %s %s %s %s\n", "DBG", plid, max_playtime, c1, c2, c3, c4);
-    printf("input: %s\n", buffer);
+    memset(request_buffer, 0, sizeof(request_buffer));
+    sprintf(request_buffer, "%s %s %s %s %s %s %s\n", "DBG", plid, max_playtime, c1, c2, c3, c4);
 
     // conectar com server
-    n = sendto(fd, buffer, strlen(buffer), 0, res->ai_addr, res->ai_addrlen);
+    n = sendto(fd, request_buffer, strlen(request_buffer), 0, res->ai_addr, res->ai_addrlen);
     if (n == -1) {
         std::cerr << "Error sending data\n";
         freeaddrinfo(res);
@@ -382,9 +498,11 @@ int debug_command(const char* sv_ip, const char* port, const char* plid, const c
         return 1;
     }
 
+
     // Receive response
     addrlen = sizeof(addr);
-    n = recvfrom(fd, buffer, sizeof(buffer), 0, (struct sockaddr*)&addr, &addrlen);
+    memset(response_buffer, 0, sizeof(response_buffer));
+    n = recvfrom(fd, response_buffer, sizeof(response_buffer), 0, (struct sockaddr*)&addr, &addrlen);
     if (n == -1) {
         std::cerr << "Error receiving data\n";
         freeaddrinfo(res);
@@ -392,8 +510,37 @@ int debug_command(const char* sv_ip, const char* port, const char* plid, const c
         return 1;
     }
 
-    // Output the received message
-    printf("output: %s\n", buffer);
+    num_args = sscanf(response_buffer, "%s %s\n", cmd, status);
+
+    if(strcmp(cmd, "RDB")) {
+        std::cerr << "Communication error.\n";
+        freeaddrinfo(res);
+        close(fd);
+        return 1;
+    }
+    
+    switch (num_args){
+        case 2:
+            if(!strcmp(status, "NOK")) {
+                std::cout << "Player " << plid << " already has an ongoing game.\n";
+            }
+            else if(!strcmp(status, "OK")) {
+                std::cout << "New game started in debug mode (max " << max_playtime <<"sec).\n";
+            }
+            else if(!!strcmp(status, "ERR")) {
+                std::cout << "Something is not right. Check the validity of the following arguments:\n" <<
+                            "-> Syntax of \"DBG\" message\n" <<
+                            "-> PLID\n-> Color code\n" <<
+                            "-> Max play time (cannot be over 600 seconds)\n";
+            }
+            else {
+                std::cerr << "Communication error.\n";
+            }
+            break;
+        default:
+            std::cerr << "Communication error.\n";
+            break;
+    }
 
     // clean up
     freeaddrinfo(res);

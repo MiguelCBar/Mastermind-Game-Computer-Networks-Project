@@ -6,6 +6,8 @@
 #define SV_IP "127.0.0.1"
 #define PORT "58058" //58000 + GN, where GN is 58
 #define PLID_SIZE 6
+#define INACTIVE_GAME 0
+#define ACTIVE_GAME 1
 
 #include "commands.h"
 
@@ -13,17 +15,6 @@ int main(int argc, char* argv[]) {
 
     int num_args, nT;
     const char *sv_ip, *port;
-
-    /* if (argc > 1 && argv[1] != NULL) {
-        sv_ip = argv[1];
-    } else {
-        sv_ip = SV_IP;
-    }
-    if (argc > 2 && argv[2] != NULL) {
-        port = argv[2];
-    } else {
-        port = PORT;
-    } */
 
     if (argc == 1) {
         sv_ip = SV_IP;
@@ -53,67 +44,78 @@ int main(int argc, char* argv[]) {
         std::cerr << "Error in writing arguments, the correct structure is as follows: ./player [-n GSIP] [-p GSport]\n";
         exit(1);
     }
+
+    //No while, falta verificar mensagens de ERR, não sei se é suposto acabar o programa ou só dizer que foi um return invalido
     while(true) {
+
+        int game_state = INACTIVE_GAME;
 
         std::string input;
         char plid[32], cmd[32], arg1[32], arg2[32], arg3[32], arg4[32], arg5[32], arg6[32];
         //le comando
         std::cout << "Command: ";
-        std::getline(std::cin, input); // Captura a entrada do terminal como string
+        std::getline(std::cin, input);
 
         num_args = sscanf(input.c_str(), "%s %s %s %s %s %s %s\n", cmd, arg1, arg2, arg3, arg4, arg5, arg6);
         switch (num_args) {
             case 1:
 
-                if (strcmp(cmd, "quit") == 0){
-                    if(!end_game(sv_ip, port, plid)){
-                        return 0; // nao vai haver returns em principio, só se houver erros que seja suposto mandar o programa abaixo
+                if (!strcmp(cmd, "quit")){
+                    if(end_game(sv_ip, port, plid)); {
+                        game_state = INACTIVE_GAME;
+                        nT = 1;
                     }
-                nT = 1;
                 }
-                else if (strcmp(cmd, "exit") == 0){
+                else if (!strcmp(cmd, "exit")){
                     end_game(sv_ip, port, plid);
                     return 0; //sair do programa
                 }
-                else if (strcmp(cmd, "st") == 0 or strcmp(cmd, "show_trials") == 0) {
-                    if(!show_trials(sv_ip, port)){
-                        return 0; // nao vai haver returns em principio, só se houver erros que seja suposto mandar o programa abaixo
-                    }
+                else if (!strcmp(cmd, "st") || !strcmp(cmd, "show_trials")) {
+                    show_trials(sv_ip, port);
                 }
-                else if (strcmp(cmd, "sb") == 0 or strcmp(cmd, "scoreboard") == 0) {
-                    if(!scoreboard(sv_ip, port)){
-                        return 0; // nao vai haver returns em principio, só se houver erros que seja suposto mandar o programa abaixo
-                    }
+                else if (!strcmp(cmd, "sb") || !strcmp(cmd, "scoreboard")) {
+                    scoreboard(sv_ip, port);
                 }
                 else {
-                    printf("comando inválido\n");
+                    std::cout << "Invalid command. Check cmd or number of arguments\n";
                 }
                 break;
 
             case 3:
-                if(!start_game(sv_ip, port, arg1, arg2)){
-                    return 0; // nao vai haver returns em principio, só se houver erros que seja suposto mandar o programa abaixo
+                if(!strcmp(cmd, "start")) {
+                    if(start_game(sv_ip, port, arg1, arg2)){ 
+                        nT = 1;
+                        strncpy(plid, arg1, PLID_SIZE);
+                    }
                 }
-                nT = 1;
-                strncpy(plid, arg1, PLID_SIZE);
-                //printf("plid: %s/n", plid);
+                else {
+                    std::cout << "Invalid command. Check cmd or number of arguments\n";
+                }
                 break;
 
             case 5:
-                if(!try_command(sv_ip, port, arg1, arg2, arg3, arg4, nT, plid)) {
-                    return 0; // nao vai haver returns em principio, só se houver erros que seja suposto mandar o programa abaixo
+                if(!strcmp(cmd, "try")) {
+                    try_command(sv_ip, port, arg1, arg2, arg3, arg4, &nT, plid);
                 }
-                nT++;
+                else {
+                    std::cout << "Invalid command. Check cmd or number of arguments\n";
+                }
                 break;
 
             case 7:
-                if(!debug_command(sv_ip, port, arg1, arg2, arg3, arg4, arg5, arg6)) {
-                    return 0; // nao vai haver returns em principio, só se houver erros que seja suposto mandar o programa abaixo
-                } break;
+                if(!strcmp(cmd, "debug")) {
+                    if(debug_command(sv_ip, port, arg1, arg2, arg3, arg4, arg5, arg6, game_state)) {
+                        nT = 1;
+                        strncpy(plid, arg1, PLID_SIZE);
+                    }
+                }   
+                else {
+                    std::cout << "Invalid command. Check cmd or number of arguments\n";
+                } 
+                break;
 
             default:
-                // numero de argumentos inválido
-                return 0;
+                std::cout << "Invalid command. Check cmd or number of arguments\n";
         }
     }
     return 0;

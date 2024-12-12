@@ -24,9 +24,9 @@
 
 // Gera um código de cores no formato "RRRR"
 void generateColorCode(char* color_code) {
-    const char colors[] = "RGBY";
+    const char colors[] = "RGBYOP";
     for (int i = 0; i < 4; i++) {
-        color_code[i] = colors[rand() % 4];
+        color_code[i] = colors[rand() % COLOR_NUMBER];
     }
     color_code[4] = '\0'; // Add the '\0' character
 }
