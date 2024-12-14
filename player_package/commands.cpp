@@ -112,12 +112,15 @@ int end_game(const char* sv_ip, const char* port, const char* plid) {
         case 2:
             if(!strcmp(status, "NOK")) {
                 std::cout << "Player does not have an ongoing game.\n";
+                return -1;
             }
             else if(!strcmp(status, "ERR")) {
                 std::cout << "Something went wrong.\n";
+                return -1;
             }
             else {
                 std::cerr << "Communication error.\n";
+                return -1;
             }
             break;
         case 6:
