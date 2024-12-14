@@ -13,6 +13,7 @@
 #define SV_IP "127.0.0.1"
 #define PORT "58058" //58000 + GN, where GN is 58
 #define PLID_SIZE 6
+#define GAME_WON 1
 
 bool verifyPLID(const std::string& input) {
     // Verifica se tem exatamente 6 caracteres e todos são dígitos
@@ -294,7 +295,7 @@ int start_game(const char* sv_ip, const char* port, const char* plid, const char
             else if(!strcmp(status, "OK")) {
                 std::cout << "New game started (max " << max_playtime <<" sec).\n";
             }
-            else if(!!strcmp(status, "ERR")) {
+            else if(!strcmp(status, "ERR")) {
                 std::cout << "Something is not right. Probably player PLID is invalid, time is over 600 seconds or the syntax of the \"SNG\" is incorrect\n.";
             }
             else {
@@ -326,6 +327,7 @@ int try_command(const char* sv_ip, const char* port, const char* c1, const char*
     char cmd[32], status[32], arg1[32], arg2[32], arg3[32], arg4[32];
 
 
+    //talvez não seja preciso, pois já é testado no debug/start
     if(!verifyPLID(plid)) {
         std::cerr << "Invalid PLID. Variable must be six digits long.\n";
         return 0;
@@ -336,8 +338,6 @@ int try_command(const char* sv_ip, const char* port, const char* c1, const char*
         return 0;
     }
     
-
-
     // Create UDP socket
     fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (fd == -1) {
@@ -412,8 +412,10 @@ int try_command(const char* sv_ip, const char* port, const char* c1, const char*
         case 5:
             if(!strcmp(status, "OK")) {
                 if (!strcmp(arg2, "4")) {
-                    
                     std::cout << "Congratulations!! You correctly guessed the secret color code in " << arg1 << "trials\n";
+                    freeaddrinfo(res);
+                    close(fd);
+                    return GAME_WON;
                 }
                 else {
                     std::cout << "nB: " << arg2 << "\tnW: " << arg3 << "\n"; // meter numero de trials

@@ -6,6 +6,7 @@
 #define SV_IP "127.0.0.1"
 #define PORT "58058" //58000 + GN, where GN is 58
 #define PLID_SIZE 6
+#define GAME_WON 1
 
 #include "commands.h"
 
@@ -67,7 +68,9 @@ int main(int argc, char* argv[]) {
                             nT = 1;
                         }
                     }
-                    else {std::cout << "You do not have an ongoing game\n"; }
+                    else {
+                        std::cout << "You do not have an ongoing game\n";
+                    }
                 
                 }
                 else if (!strcmp(cmd, "exit")){
@@ -77,7 +80,11 @@ int main(int argc, char* argv[]) {
                     return 0; //sair do programa
                 }
                 else if (!strcmp(cmd, "st") || !strcmp(cmd, "show_trials")) {
-                    show_trials(sv_ip, port);
+                    if (active_game) {
+                        show_trials(sv_ip, port);
+                    } else {
+                        std::cout << "You do not have an ongoing game\n";
+                    }
                 }
                 else if (!strcmp(cmd, "sb") || !strcmp(cmd, "scoreboard")) {
                     scoreboard(sv_ip, port);
@@ -102,7 +109,14 @@ int main(int argc, char* argv[]) {
 
             case 5:
                 if(!strcmp(cmd, "try")) {
-                    try_command(sv_ip, port, arg1, arg2, arg3, arg4, &nT, plid);
+                    if (active_game) {
+                        if (try_command(sv_ip, port, arg1, arg2, arg3, arg4, &nT, plid) == GAME_WON) {
+                            
+                            active_game = false; // MANDAR POINTER LA PRA DENTRO?????
+                        }
+                    } else {
+                        std::cout << "You do not have an ongoing game\n";
+                    }
                 }
                 else {
                     std::cout << "Invalid command. Check cmd or number of arguments\n";
