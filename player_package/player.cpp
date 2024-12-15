@@ -52,12 +52,12 @@ int main(int argc, char* argv[]) {
     while(true) {
 
         std::string input;
-        char plid[32], cmd[32], arg1[32], arg2[32], arg3[32], arg4[32], arg5[32], arg6[32];
+        char plid[32], cmd[32], arg1[32], arg2[32], arg3[32], arg4[32], arg5[32], arg6[32], extra[32];
         //le comando
         std::cout << "Command: ";
         std::getline(std::cin, input);
 
-        num_args = sscanf(input.c_str(), "%s %s %s %s %s %s %s\n", cmd, arg1, arg2, arg3, arg4, arg5, arg6);
+        num_args = sscanf(input.c_str(), "%s %s %s %s %s %s %s %s\n", cmd, arg1, arg2, arg3, arg4, arg5, arg6, extra);
         switch (num_args) {
             case 1:
 
@@ -81,7 +81,7 @@ int main(int argc, char* argv[]) {
                 }
                 else if (!strcmp(cmd, "st") || !strcmp(cmd, "show_trials")) {
                     if (active_game) {
-                        show_trials(sv_ip, port);
+                        show_trials(sv_ip, port, plid);
                     } else {
                         std::cout << "You do not have an ongoing game\n";
                     }
@@ -112,7 +112,7 @@ int main(int argc, char* argv[]) {
                     if (active_game) {
                         if (try_command(sv_ip, port, arg1, arg2, arg3, arg4, &nT, plid) == GAME_WON) {
                             
-                            active_game = false; // MANDAR POINTER LA PRA DENTRO?????
+                            //active_game = false; // MANDAR POINTER LA PRA DENTRO?????
                         }
                     } else {
                         std::cout << "You do not have an ongoing game\n";

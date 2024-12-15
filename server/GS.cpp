@@ -262,7 +262,8 @@ int main(int argc, char* argv[]) {
                     }
                     write(1, "received: ", 10);
                     write(1, buffer, n);
-                    n = write(new_fd, "recebido show trials!\n", strlen("recebido show trials!\n"));
+                    n = write(new_fd, "RST ACT 101101_game.txt 62\n\t1 - R R P P nB=1, nW=0\n\t2 - R G G B nB=2, nW=1 - 73 s to go!\n", 
+                        strlen("RST ACT 101101_game.txt 62\n\t1 - R R P P nB=1, nW=0\n\t2 - R G G B nB=2, nW=1 - 73 s to go!\n"));
                     if(n == -1) {
                         perror("write");
                         exit(1);
