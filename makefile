@@ -8,11 +8,11 @@ CXXFLAGS = -Wall -std=c++11
 TARGETS = player GS
 
 # Source files for each executable
-PLAYER_SRC = player_package/player.cpp player_package/commands.cpp
+PLAYER_SRC = player_package/player.cpp player_package/commands.cpp utils.cpp
 GS_SRC = server/GS.cpp
 
 # Object files for each executable
-PLAYER_OBJ = player_package/player.o player_package/commands.o
+PLAYER_OBJ = player_package/player.o player_package/commands.o utils.o
 GS_OBJ = server/GS.o
 
 # Default target to build all executables
@@ -32,6 +32,9 @@ player.o: player_package/player.cpp
 
 commands.o: player_package/commands.cpp
 	$(CXX) $(CXXFLAGS) -c player_package/commands.cpp -o commands.o
+
+utils.o: utils.cpp
+	$(CXX) $(CXXFLAGS) -c utils.cpp -o utils.o
 
 GS.o: server/GS.cpp
 	$(CXX) $(CXXFLAGS) -c server/GS.cpp -o GS.o

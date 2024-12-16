@@ -9,7 +9,7 @@
 #include <arpa/inet.h>
 
 #include "commands.h"
-#include "utils.h"
+#include "../utils.h"
 
 #define SV_IP "127.0.0.1"
 #define PORT "58058" //58000 + GN, where GN is 58
