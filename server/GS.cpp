@@ -12,6 +12,7 @@
 #include <ctime>
 #include <iomanip>
 
+#include "utils.h"
 
 #define PORT "58058" //58000 + GN, where GN is 58
 #define NOT_VERBOSE 2
@@ -32,12 +33,24 @@ void generateColorCode(char* color_code) {
 }
 
 
-int startGame(const char* plid, const char* max_playtime, const char* mode, const char* c1, const char* c2, const char* c3, const char* c4) {
+int startGame(const char* plid, const char* max_playtime, const char* mode, const char* c1, const char* c2, const char* c3, const char* c4, char* response_buffer) {
 
     time_t fulltime;                                         
     struct tm* currentTime;
     char first_file_line[128], file_name[64], time_str[20];
     char color_code[5]; // 4 chars + null terminator
+
+    if(!verifyPLID(plid) || !verifyMaxPlaytime(max_playtime)) {
+        sprintf(response_buffer, "RSG ERR\n");
+        return ERROR;
+    }
+
+    else if(!strcmp(mode, "D") && (!verifyColor(c1) || !verifyColor(c2) || !verifyColor(c3) || !verifyColor(c4))) {
+        sprintf(response_buffer, "RSG ERR\n");
+        return ERROR;
+    }
+
+
 
     // File name
     sprintf(file_name, "./server/GAMES/GAME_%s.txt", plid);
@@ -48,7 +61,7 @@ int startGame(const char* plid, const char* max_playtime, const char* mode, cons
         char existing_plid[6];
         // Arquivo existe; verificar o `plid`
         if (fscanf(file, "%s", existing_plid) == 1) {
-            if (strcmp(existing_plid, plid) == 0) {
+            if (!strcmp(existing_plid, plid)) {
                 // game with plid already on course, close arquive and return
                 fclose(file);
                 printf("Game on course with same PLID: %s\n", existing_plid);
@@ -95,6 +108,46 @@ int startGame(const char* plid, const char* max_playtime, const char* mode, cons
 }
 
 
+int testTrial(const char* plid, const char* c1, const char* c2, const char* c3, const char* c4, const char* trial_number) {
+
+    // testar a trial
+    // ler do ficheiro o codigo suposto de acertar
+    
+    /* if(!verifyColor(c1) || !verifyColor(c2) || !verifyColor(c3) || !verifyColor(c4)) {
+        std::cerr << "Incorrect color Code. Possible colors are:\nR -> Red\nG -> Green\nB -> Blue\nY -> Yellow\nO -> Orange\nP -> purple\n";
+        return 0;
+    } */
+    char color_code[5] = "RRRR";
+    char guess[5];
+    int verified_colors[4] = {false, false, false, false};
+    int nB = 0, nW = 0;
+
+    sprintf(guess, "%s%s%s%s", c1, c2, c3, c4);
+
+    for (int i = 0; i < 4; i++) {
+        if (guess[i] == color_code[i]) {
+            verified_colors[i] = true;
+            nB++;
+        }
+    }
+    for (int i = 0; i < 4; i++) {
+        if (!verified_colors[i]) {
+            for(int j = 0; j < 4; j++) {
+                if (i != j && !verified_colors[j] && guess[i] == color_code[j]) {
+                    nW++;
+                    verified_colors[j] = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    // escrever msg no pointer que veio como argumento
+
+    return 1;
+}
+
+
 int resolveUDPCommands(const char* input, char* response_buffer) {
 
     int num_args;
@@ -103,20 +156,43 @@ int resolveUDPCommands(const char* input, char* response_buffer) {
     num_args = sscanf(input, "%s %s %s %s %s %s %s\n", cmd, arg1, arg2, arg3, arg4, arg5, arg6);
 
     switch(num_args) {
+        
+        case 2:
+            if (!strcmp(cmd, "QUT")) {
+                /* if(!endGame()) {
+                    return 0;
+                } */
+               ;
+            }
+            else {
+                std::cerr << "Communication error.\n";
+            }
+            
 
         case 3:
-            if (strcmp(cmd, "SNG") == 0){
+            if (!strcmp(cmd, "SNG")){
                 if(!startGame(arg1, arg2, "P", arg3, arg4, arg5, arg6)){
                     return 0; // nao vai haver returns em principio, só se houver erros que seja suposto mandar o programa abaixo
                 }
             }
+            else {
+                std::cerr << "Communication error.\n";
+            }
             break;
 
         case 7:
-            if (strcmp(cmd, "DBG") == 0){
+            if (!strcmp(cmd, "DBG")){
                 if(!startGame(arg1, arg2, "D", arg3, arg4, arg5, arg6)){
                     return 0; // nao vai haver returns em principio, só se houver erros que seja suposto mandar o programa abaixo
                 }
+            }
+            else if (!strcmp(cmd, "TRY")) {
+                if(!testTrial(arg1, arg2, arg3, arg4, arg5, arg6)){
+                    return 0; // nao vai haver returns em principio, só se houver erros que seja suposto mandar o programa abaixo
+                }
+            }
+            else {
+                std::cerr << "Communication error.\n";
             }
             break;            
     }
@@ -166,8 +242,6 @@ int main(int argc, char* argv[]) {
     hints.ai_family = AF_INET;       // IPv4
     hints.ai_socktype = 0; // Socket UDP
     hints.ai_flags = AI_PASSIVE;    // Aceitar conexões
-
-
 
     // Obter informações do endereço
     int errcode = getaddrinfo(NULL, port, &hints, &res);
