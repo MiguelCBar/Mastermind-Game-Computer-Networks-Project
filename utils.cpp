@@ -48,3 +48,12 @@ bool verifyColor(const std::string& color) {
     std::string validColors = "RGBYOP";
     return color.length() == 1 && validColors.find(color) != std::string::npos;
 }
+
+
+void generateColorCode(char* color_code) {
+    const char colors[] = "RGBYOP";
+    for (int i = 0; i < 4; i++) {
+        color_code[i] = colors[rand() % COLOR_NUMBER];
+    }
+    color_code[4] = '\0'; // Add the '\0' character
+}

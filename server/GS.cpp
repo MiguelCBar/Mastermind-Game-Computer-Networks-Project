@@ -18,26 +18,16 @@
 #define NOT_VERBOSE 2
 #define VERBOSE 3
 #define COLOR_NUMBER 6
+#define ERROR -1
 
 
 //provavelmente, falta mais close(tcp_socket) e close(udp_socket), nos erros
-
-
-// Gera um código de cores no formato "RRRR"
-void generateColorCode(char* color_code) {
-    const char colors[] = "RGBYOP";
-    for (int i = 0; i < 4; i++) {
-        color_code[i] = colors[rand() % COLOR_NUMBER];
-    }
-    color_code[4] = '\0'; // Add the '\0' character
-}
-
 
 int startGame(const char* plid, const char* max_playtime, const char* mode, const char* c1, const char* c2, const char* c3, const char* c4, char* response_buffer) {
 
     time_t fulltime;                                         
     struct tm* currentTime;
-    char first_file_line[128], file_name[64], time_str[20];
+    char first_file_line[128], file_name[64], time_str[20], buffer[128];
     char color_code[5]; // 4 chars + null terminator
 
     if(!verifyPLID(plid) || !verifyMaxPlaytime(max_playtime)) {
@@ -49,31 +39,32 @@ int startGame(const char* plid, const char* max_playtime, const char* mode, cons
         sprintf(response_buffer, "RSG ERR\n");
         return ERROR;
     }
-
-
-
+    
     // File name
     sprintf(file_name, "./server/GAMES/GAME_%s.txt", plid);
-
-    // Tenta abrir o arquivo no modo de leitura
     FILE* file = fopen(file_name, "r");
+
     if (file) {
-        char existing_plid[6];
-        // Arquivo existe; verificar o `plid`
-        if (fscanf(file, "%s", existing_plid) == 1) {
+        fgets(buffer, sizeof(buffer), file);
+        if (fgets(buffer, sizeof(buffer), file) != NULL) {
+            fclose(file);
+            sprintf(response_buffer, "RSG NOK\n");
+            return 1;
+        }
+        /* char existing_plid[6];
+        if (fscanf(file, "%s", existing_plid)) {
             if (!strcmp(existing_plid, plid)) {
                 // game with plid already on course, close arquive and return
                 fclose(file);
                 printf("Game on course with same PLID: %s\n", existing_plid);
                 return 0; // Ou um código específico para indicar que não foi criado
-            }
-        }
-        fclose(file);
-    }   // file doesnt exist, start a new game
-
-    //memset(color_code, 0, sizeof(color_code));
-
-    if (strcmp(mode, "P") == 0) {
+            } 
+        } */
+    }
+    fclose(file);
+    
+    memset(color_code, 0, sizeof(color_code));
+    if (!strcmp(mode, "P")) {
         generateColorCode(color_code);
     }
     else {
@@ -84,7 +75,7 @@ int startGame(const char* plid, const char* max_playtime, const char* mode, cons
     time(&fulltime);            // Current time in seconds since 1970
     currentTime = gmtime(&fulltime);
 
-    long momentoInicio = fulltime;  // Time in seconds sin 1970
+    long initialTime = fulltime;  // Time in seconds sin 1970
 
     sprintf(time_str, "%04d-%02d-%02d %02d:%02d:%02d",
              currentTime->tm_year + 1900, currentTime->tm_mon + 1, currentTime->tm_mday,
@@ -93,30 +84,73 @@ int startGame(const char* plid, const char* max_playtime, const char* mode, cons
     // Create the file
     file = fopen(file_name, "w");
     if (!file) {
-        perror("Erro ao criar ficheiro");
-        return -1;
+        sprintf(response_buffer, "RSG ERR\n");
+        return ERROR;
     }
 
     // First line of the file
-    sprintf(first_file_line, "%s %s %s %s %s %ld", plid, mode, color_code, max_playtime, time_str, momentoInicio);
+    sprintf(first_file_line, "%s %s %s %s %s %ld", plid, mode, color_code, max_playtime, time_str, initialTime);
     fprintf(file, "%s\n", first_file_line);
 
-    // Close the file
+    sprintf(response_buffer, "RSG OK\n");
     fclose(file);
-    
     return 1;
 }
 
 
-int testTrial(const char* plid, const char* c1, const char* c2, const char* c3, const char* c4, const char* trial_number) {
+int testTrial(const char* plid, const char* c1, const char* c2, const char* c3, const char* c4, const char* trial_number, char* response_buffer) {
+
+
+    if(!verifyPLID(plid) || !verifyColor(c1) || !verifyColor(c2) || !verifyColor(c3) || !verifyColor(c4)){
+        sprintf(response_buffer, "RTR ERR\n");
+        return ERROR;
+    }
+    char file_name[64];
+    char old_guess[5], new_guess[5];
+    bool duplicated = false;
+    sprintf(new_guess, "%s%s%s%s", c1, c2, c3, c4);
+
+    // test duplicated trial
+    sprintf(file_name, "./server/GAMES/GAME_%s.txt", plid);
+    FILE* file = fopen(file_name, "r"); // Opens the file in read mode
+    
+    if (file) { // Verifica se o ficheiro foi aberto com sucesso
+        sprintf(response_buffer, "RTR ERR\n");
+        return ERROR;
+    }
+    char line[256]; // Buffer para armazenar cada linha lida do ficheiro
+    bool firstLine = true; // Flag para ignorar a primeira linha do ficheiro
+    int trials = 0;
+
+    fgets(line, sizeof(line), file);    // ignore first line
+    while (fgets(line, sizeof(line), file)) {
+        trials++;
+        sscanf(line, "T: %4s ", old_guess);     // Extrai a sequência de cores (CCCC) da linha
+
+        if (!strcmp(old_guess, new_guess)) {    // Check if there's a duplicated guess
+            fclose(file); // Fecha o ficheiro
+            duplicated = true;
+        }
+    }
+    
+    if(std::atoi(trial_number) == trials && duplicated) {
+        sprintf(response_buffer, "RTR OK\n");
+    }
+    else if (std::atoi(trial_number) != trials + 1) {
+        sprintf(response_buffer, "RTR INV\n");
+    }
+    else {
+        sprintf(response_buffer, "RTR OK\n");
+    }
+
+    fclose(file); // Fecha o ficheiro
+    //return false; // Não há guess duplicada
+
+
+
 
     // testar a trial
     // ler do ficheiro o codigo suposto de acertar
-    
-    /* if(!verifyColor(c1) || !verifyColor(c2) || !verifyColor(c3) || !verifyColor(c4)) {
-        std::cerr << "Incorrect color Code. Possible colors are:\nR -> Red\nG -> Green\nB -> Blue\nY -> Yellow\nO -> Orange\nP -> purple\n";
-        return 0;
-    } */
     char color_code[5] = "RRRR";
     char guess[5];
     int verified_colors[4] = {false, false, false, false};
@@ -171,7 +205,7 @@ int resolveUDPCommands(const char* input, char* response_buffer) {
 
         case 3:
             if (!strcmp(cmd, "SNG")){
-                if(!startGame(arg1, arg2, "P", arg3, arg4, arg5, arg6)){
+                if(!startGame(arg1, arg2, "P", arg3, arg4, arg5, arg6, response_buffer)){
                     return 0; // nao vai haver returns em principio, só se houver erros que seja suposto mandar o programa abaixo
                 }
             }
@@ -182,12 +216,12 @@ int resolveUDPCommands(const char* input, char* response_buffer) {
 
         case 7:
             if (!strcmp(cmd, "DBG")){
-                if(!startGame(arg1, arg2, "D", arg3, arg4, arg5, arg6)){
+                if(!startGame(arg1, arg2, "D", arg3, arg4, arg5, arg6, response_buffer)){
                     return 0; // nao vai haver returns em principio, só se houver erros que seja suposto mandar o programa abaixo
                 }
             }
             else if (!strcmp(cmd, "TRY")) {
-                if(!testTrial(arg1, arg2, arg3, arg4, arg5, arg6)){
+                if(!testTrial(arg1, arg2, arg3, arg4, arg5, arg6, response_buffer)){
                     return 0; // nao vai haver returns em principio, só se houver erros que seja suposto mandar o programa abaixo
                 }
             }
@@ -294,7 +328,7 @@ int main(int argc, char* argv[]) {
         timeout.tv_sec = 10;
         out_fds = select(FD_SETSIZE, &test_fd_sockets, (fd_set*) NULL, (fd_set*)NULL, (struct timeval*) &timeout);
         switch(out_fds) {
-            case -1:
+            case ERROR:
                 perror("Error in Select function");
                 exit(1);
             case 0:
@@ -316,7 +350,7 @@ int main(int argc, char* argv[]) {
                     
 
                     // Enviar resposta para o cliente
-                    if (sendto(udp_socket, buffer, n, 0, (struct sockaddr*)&addr, addrlen) == -1) {
+                    if (sendto(udp_socket, buffer, n, 0, (struct sockaddr*)&addr, addrlen) == ERROR) {
                         perror("sendto");
                         exit(1);
                     }
@@ -329,7 +363,7 @@ int main(int argc, char* argv[]) {
 
                         exit(1);
                     }
-                    n = read(new_fd, buffer, 128);
+                    /* n = read(new_fd, buffer, 128);
                     if(n == -1) {
                         perror("read");
                         exit(1);
@@ -341,7 +375,7 @@ int main(int argc, char* argv[]) {
                     if(n == -1) {
                         perror("write");
                         exit(1);
-                    }
+                    } */
                     
                     close(new_fd);
                 }
