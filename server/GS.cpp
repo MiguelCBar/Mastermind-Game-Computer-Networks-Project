@@ -18,33 +18,49 @@
 
 namespace fs = std::filesystem;
 
-/* #define PORT "58058" //58000 + GN, where GN is 58
-#define NOT_VERBOSE 2
-#define VERBOSE 3
-#define COLOR_NUMBER 6
-#define ERROR -1 */
-
-
 //provavelmente, falta mais close(tcp_socket) e close(udp_socket), nos erros
+int handlerQuitCommand(const char* plid, char* response_buffer) {
+    FILE* file;
+    char file_name[64];
+    if(!validPLID(plid)) {
+        sprintf(response_buffer, "RQT ERR\n");
+        return ERROR;
+    }
+    if(gameOn(plid)) {
+        if(timeExceeded(plid)) {
+            endGame(plid, TIMEOUT);
+            sprintf(response_buffer, "RQT NOK\n");
+        }
+        endGame(plid, QUIT);
+        sprintf(response_buffer, "RQT OK\n");
 
-int endGame(const char* plid, char* response_buffer, const char* finisher_mode) {
+    }
+    else {
+        sprintf(response_buffer, "RQT NOK\n");
+    }
+    return 0;
+}
+
+
+
+int endGame(const char* plid, const char* finisher_mode) {
 
     char player_directory[256], file_name[256], time_str[16], last_file_line[256], first_file_line[256];
     time_t fulltime;                                         
     struct tm* currentTime;
 
-    if(!validPlid(plid)) {
+/*     if(!validPLID(plid)) {
         sprintf(response_buffer, "RSG ERR\n");
         return ERROR;        
-    }
+    } */
 
     memset(file_name, 0, sizeof(file_name));
     sprintf(file_name, "./server/GAMES/GAME_%s.txt", plid);
     FILE* file = fopen(file_name, "r+");
 
-    if(!file) { //verify if game does not exist
-        sprintf(response_buffer, "RSG NOK\n");
-        return 0;   
+    if(!file) {
+        //ERRO
+        return ERROR;   
     }
     
     memset(player_directory, 0, sizeof(player_directory));
@@ -120,7 +136,7 @@ int startGame(const char* plid, const char* max_playtime, const char* mode, cons
     FILE* fd;
 
     memset(response_buffer, 0, sizeof(response_buffer));
-    if(!validPlid(plid) || !verifyMaxPlaytime(max_playtime)) {
+    if(!validPLID(plid) || !verifyMaxPlaytime(max_playtime)) {
         sprintf(response_buffer, "RSG ERR\n");
         return ERROR;
     }
@@ -189,7 +205,7 @@ int startGame(const char* plid, const char* max_playtime, const char* mode, cons
 
 int testTrial(const char* plid, const char* c1, const char* c2, const char* c3, const char* c4, const char* new_trial_number, char* response_buffer) {
 
-    if(!validPlid(plid) || !validColor(c1) || !validColor(c2) || !validColor(c3) || !validColor(c4)){
+    if(!validPLID(plid) || !validColor(c1) || !validColor(c2) || !validColor(c3) || !validColor(c4)){
         sprintf(response_buffer, "RTR ERR\n");
         return ERROR;
     }

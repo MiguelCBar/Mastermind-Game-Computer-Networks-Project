@@ -450,7 +450,7 @@ int start_game(const char* sv_ip, const char* port, const char* plid, const char
     char request_buffer[256], response_buffer[256];
     char cmd[32], status[32];
 
-    if(!verifyPLID(plid)) {
+    if(!validPLID(plid)) {
         std::cerr << "Invalid PLID. Variable must be six digits long.\n";
         return 0;
     }
@@ -553,12 +553,12 @@ int try_command(const char* sv_ip, const char* port, const char* c1, const char*
 
 
     //talvez não seja preciso, pois já é testado no debug/start
-    if(!verifyPLID(plid)) {
+    if(!validPLID(plid)) {
         std::cerr << "Invalid PLID. Variable must be six digits long.\n";
         return 0;
     }
 
-    if(!verifyColor(c1) || !verifyColor(c2) || !verifyColor(c3) || !verifyColor(c4)) {
+    if(!validColor(c1) || !validColor(c2) || !validColor(c3) || !validColor(c4)) {
         std::cerr << "Incorrect color Code. Possible colors are:\nR -> Red\nG -> Green\nB -> Blue\nY -> Yellow\nO -> Orange\nP -> purple\n";
         return 0;
     }
@@ -685,7 +685,7 @@ int debug_command(const char* sv_ip, const char* port, const char* plid, const c
     char request_buffer[256], response_buffer[256];
     char cmd[32], status[32];
 
-    if(!verifyPLID(plid)) {
+    if(!validPLID(plid)) {
         std::cerr << "Invalid PLID. Variable must be six digits long.\n";
         return 0;
     }
@@ -693,7 +693,7 @@ int debug_command(const char* sv_ip, const char* port, const char* plid, const c
         std::cerr << "Invalid Max Playtime. Variable must be less than 600 seconds.\n";
         return 0;
     }
-    if(!verifyColor(c1) || !verifyColor(c2) || !verifyColor(c3) || !verifyColor(c4)) {
+    if(!validColor(c1) || !validColor(c2) || !validColor(c3) || !validColor(c4)) {
         std::cerr << "Incorrect color Code. Possible colors are:\nR -> Red\nG -> Green\nB -> Blue\nY -> Yellow\nO -> Orange\nP -> purple\n";
         return 0;
     }

@@ -16,4 +16,5 @@
 - verificações de erro na mensagem são antes ou depois de testar se um jogo está a decorrer?
 - shutdown nos ficheiros ou close chega?
 - tem mal abrir e fechar várias vezes os ficheiros?
+- O VERBOSE pode ser uma variável global?
 
