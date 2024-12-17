@@ -2,7 +2,7 @@
 #include "constants.h"
 #include <fstream>
 
-bool verifyPLID(const std::string& input) {
+bool validPLID(const std::string& input) {
     // Verifica se tem exatamente 6 caracteres e todos são dígitos
     if (input.length() == 6) {
         for (char c : input) {
@@ -57,7 +57,7 @@ bool parseFileHeader(const std::string& response_buffer, ssize_t* file_size, cha
     return false;
 }
 
-bool verifyColor(const std::string& color) {
+bool validColor(const std::string& color) {
     std::string validColors = "RGBYOP";
     return color.length() == 1 && validColors.find(color) != std::string::npos;
 }

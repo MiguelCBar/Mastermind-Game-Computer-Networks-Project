@@ -33,7 +33,7 @@ int endGame(const char* plid, char* response_buffer, const char* finisher_mode) 
     time_t fulltime;                                         
     struct tm* currentTime;
 
-    if(!verifyPLID(plid)) {
+    if(!validPlid(plid)) {
         sprintf(response_buffer, "RSG ERR\n");
         return ERROR;        
     }
@@ -94,7 +94,7 @@ int endGame(const char* plid, char* response_buffer, const char* finisher_mode) 
     sscanf(first_file_line + 15, "%03d %*04d-%*02d-%*02d %*02d:%*02d:%*02d %ld", &max_game_time, &start_time);
 
     time_t current_time = time(NULL);
-    int game_duration = (int)difftime(current_time, start_time); // VERIFICAR SE É PRECISO PPASSAR O START TIME PARA TIME PORQUE FOI LIDO COM %ld
+    int game_duration = (int)difftime(current_time, start_time); // VERIFICAR SE É PRECISO PASSAR O START TIME PARA TIME PORQUE FOI LIDO COM %ld
 
     if(game_duration > max_game_time) {game_duration = max_game_time;}
 
@@ -120,29 +120,28 @@ int startGame(const char* plid, const char* max_playtime, const char* mode, cons
     FILE* fd;
 
     memset(response_buffer, 0, sizeof(response_buffer));
-    if(!verifyPLID(plid) || !verifyMaxPlaytime(max_playtime)) {
+    if(!validPlid(plid) || !verifyMaxPlaytime(max_playtime)) {
         sprintf(response_buffer, "RSG ERR\n");
         return ERROR;
     }
-    if(!strcmp(mode, "D") && (!verifyColor(c1) || !verifyColor(c2) || !verifyColor(c3) || !verifyColor(c4))) {
+    // debug mode
+    if(!strcmp(mode, "D") && (!validColor(c1) || !validColor(c2) || !validColor(c3) || !validColor(c4))) {
         sprintf(response_buffer, "RSG ERR\n");
         return ERROR;
     }
-
-    // File name
     memset(file_name, 0, sizeof(file_name));
     sprintf(file_name, "./server/GAMES/GAME_%s.txt", plid);
     FILE* file = fopen(file_name, "r");
 
+    memset(buffer, 0, sizeof(buffer));              // clean buffer
 
-    memset(buffer, 0, sizeof(buffer));
-
-    fgets(buffer, sizeof(buffer), file);
+    fgets(buffer, sizeof(buffer), file);            // ignore first line
     if (fgets(buffer, sizeof(buffer), file) != NULL) {
         fclose(file);
-        sprintf(response_buffer, "RSG NOK\n");
+        sprintf(response_buffer, "RSG NOK\n");      // already has a game going
         return 0;
     }
+    fclose(file);
     /* char existing_plid[6];
     if (fscanf(file, "%s", existing_plid)) {
         if (!strcmp(existing_plid, plid)) {
@@ -152,14 +151,11 @@ int startGame(const char* plid, const char* max_playtime, const char* mode, cons
             return 0; // Ou um código específico para indicar que não foi criado
         } 
     } */
-
-    fclose(file);
-    
-    memset(color_code, 0, sizeof(color_code));
-    if (!strcmp(mode, "P")) {
+    memset(color_code, 0, sizeof(color_code));      // clear color_code
+    if (!strcmp(mode, "P")) {                       // normal game
         generateColorCode(color_code);
     }
-    else {
+    else {  // debug mode --> use color code requested by user
         sprintf(color_code, "%s%s%s%s", c1, c2, c3, c4);
     }
     //printf(" ------------------- color code: %s\n", color_code);
@@ -191,9 +187,9 @@ int startGame(const char* plid, const char* max_playtime, const char* mode, cons
 }
 
 
-int testTrial(const char* plid, const char* c1, const char* c2, const char* c3, const char* c4, const char* trial_number, char* response_buffer) {
+int testTrial(const char* plid, const char* c1, const char* c2, const char* c3, const char* c4, const char* new_trial_number, char* response_buffer) {
 
-    if(!verifyPLID(plid) || !verifyColor(c1) || !verifyColor(c2) || !verifyColor(c3) || !verifyColor(c4)){
+    if(!validPlid(plid) || !validColor(c1) || !validColor(c2) || !validColor(c3) || !validColor(c4)){
         sprintf(response_buffer, "RTR ERR\n");
         return ERROR;
     }
@@ -214,6 +210,7 @@ int testTrial(const char* plid, const char* c1, const char* c2, const char* c3, 
 
     sprintf(new_guess, "%s%s%s%s", c1, c2, c3, c4);
 
+    memset(file_name, 0, sizeof(file_name));
     sprintf(file_name, "./server/GAMES/GAME_%s.txt", plid);
     FILE* file = fopen(file_name, "r");         // Opens the file in read mode
 
@@ -227,11 +224,11 @@ int testTrial(const char* plid, const char* c1, const char* c2, const char* c3, 
     }
     fclose(file); // Closes file
     
-    if(std::atoi(trial_number) == trials && !strcmp(old_guess, new_guess)) { 
+    if(std::atoi(new_trial_number) == trials && !strcmp(old_guess, new_guess)) { 
         sprintf(response_buffer, "RTR OK\n");   // resend
         return 0;
     }
-    else if (std::atoi(trial_number) != trials + 1) {                           
+    else if (std::atoi(new_trial_number) != trials + 1) {                           
         sprintf(response_buffer, "RTR INV\n");  // invalid trial number
         return 0;
     }
@@ -265,9 +262,13 @@ int testTrial(const char* plid, const char* c1, const char* c2, const char* c3, 
             }
         }
     }
-
-    // escrever msg no pointer que veio como argumento
-
+    if (nB == 4) {
+        endGame(plid, 'W');
+    }
+    else if (trials == 7){
+        endGame(plid, 'F');
+    }
+    sprintf(response_buffer, "RTR OK\n");  // duplicated guess
     return 1;
 }
 
