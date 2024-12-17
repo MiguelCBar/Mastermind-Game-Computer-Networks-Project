@@ -27,7 +27,6 @@ namespace fs = std::filesystem;
 
 //provavelmente, falta mais close(tcp_socket) e close(udp_socket), nos erros
 
-
 int endGame(const char* plid, char* response_buffer, const char* finisher_mode) {
 
     char player_directory[256], file_name[256], time_str[16], last_file_line[256], first_file_line[256];
@@ -48,7 +47,6 @@ int endGame(const char* plid, char* response_buffer, const char* finisher_mode) 
         return 0;   
     }
     
-
     memset(player_directory, 0, sizeof(player_directory));
     sprintf(player_directory, "server/GAMES/%s", plid);
 
@@ -119,19 +117,18 @@ int startGame(const char* plid, const char* max_playtime, const char* mode, cons
     struct tm* currentTime;
     char first_file_line[128], file_name[64], time_str[20], buffer[128];
     char color_code[5]; // 4 chars + null terminator
+    FILE* fd;
 
     memset(response_buffer, 0, sizeof(response_buffer));
-
     if(!verifyPLID(plid) || !verifyMaxPlaytime(max_playtime)) {
         sprintf(response_buffer, "RSG ERR\n");
         return ERROR;
     }
-
-    else if(!strcmp(mode, "D") && (!verifyColor(c1) || !verifyColor(c2) || !verifyColor(c3) || !verifyColor(c4))) {
+    if(!strcmp(mode, "D") && (!verifyColor(c1) || !verifyColor(c2) || !verifyColor(c3) || !verifyColor(c4))) {
         sprintf(response_buffer, "RSG ERR\n");
         return ERROR;
     }
-    
+
     // File name
     memset(file_name, 0, sizeof(file_name));
     sprintf(file_name, "./server/GAMES/GAME_%s.txt", plid);
@@ -139,23 +136,23 @@ int startGame(const char* plid, const char* max_playtime, const char* mode, cons
 
 
     memset(buffer, 0, sizeof(buffer));
-    if (file) {
-        fgets(buffer, sizeof(buffer), file);
-        if (fgets(buffer, sizeof(buffer), file) != NULL) {
-            fclose(file);
-            sprintf(response_buffer, "RSG NOK\n");
-            return 1;
-        }
-        /* char existing_plid[6];
-        if (fscanf(file, "%s", existing_plid)) {
-            if (!strcmp(existing_plid, plid)) {
-                // game with plid already on course, close arquive and return
-                fclose(file);
-                printf("Game on course with same PLID: %s\n", existing_plid);
-                return 0; // Ou um código específico para indicar que não foi criado
-            } 
-        } */
+
+    fgets(buffer, sizeof(buffer), file);
+    if (fgets(buffer, sizeof(buffer), file) != NULL) {
+        fclose(file);
+        sprintf(response_buffer, "RSG NOK\n");
+        return 0;
     }
+    /* char existing_plid[6];
+    if (fscanf(file, "%s", existing_plid)) {
+        if (!strcmp(existing_plid, plid)) {
+            // game with plid already on course, close arquive and return
+            fclose(file);
+            printf("Game on course with same PLID: %s\n", existing_plid);
+            return 0; // Ou um código específico para indicar que não foi criado
+        } 
+    } */
+
     fclose(file);
     
     memset(color_code, 0, sizeof(color_code));
@@ -196,57 +193,54 @@ int startGame(const char* plid, const char* max_playtime, const char* mode, cons
 
 int testTrial(const char* plid, const char* c1, const char* c2, const char* c3, const char* c4, const char* trial_number, char* response_buffer) {
 
-
     if(!verifyPLID(plid) || !verifyColor(c1) || !verifyColor(c2) || !verifyColor(c3) || !verifyColor(c4)){
         sprintf(response_buffer, "RTR ERR\n");
         return ERROR;
     }
-    char file_name[64];
-    char old_guess[5], new_guess[5];
+    if (!gameOn(plid)) {    // does not have a game going
+        sprintf(response_buffer, "RSG NOK\n");
+        return 0;
+    }
+    if (timeExceeded(plid)) {
+        endGame(plid); // TESTAR ERROS
+        sprintf(response_buffer, "RSG ETM\n");
+        return 0;
+    }
+
+    char old_guess[5], new_guess[5], file_name[64];
+    char line[256]; // Buffer para armazenar cada linha lida do ficheiro
+    int trials = 0;
     bool duplicated = false;
+
     sprintf(new_guess, "%s%s%s%s", c1, c2, c3, c4);
 
-    // test duplicated trial
     sprintf(file_name, "./server/GAMES/GAME_%s.txt", plid);
-    FILE* file = fopen(file_name, "r"); // Opens the file in read mode
-    
-    if (file) { // Verifica se o ficheiro foi aberto com sucesso
-        sprintf(response_buffer, "RTR ERR\n");
-        return ERROR;
-    }
-    char line[256]; // Buffer para armazenar cada linha lida do ficheiro
-    bool firstLine = true; // Flag para ignorar a primeira linha do ficheiro
-    int trials = 0;
+    FILE* file = fopen(file_name, "r");         // Opens the file in read mode
 
-    fgets(line, sizeof(line), file);    // ignore first line
-    while (fgets(line, sizeof(line), file)) {
-        trials++;
-        sscanf(line, "T: %4s ", old_guess);     // Extrai a sequência de cores (CCCC) da linha
-
-        if (!strcmp(old_guess, new_guess)) {    // Check if there's a duplicated guess
-            fclose(file); // Fecha o ficheiro
+    fgets(line, sizeof(line), file);            // ignore first line
+    while (fgets(line, sizeof(line), file)) {   // while there's more lines in the file
+        trials++;                               // count how many trials have been done
+        sscanf(line, "T: %4s ", old_guess);     // get color code of the trial
+        if (!strcmp(old_guess, new_guess)) {    // check if there's a duplicated guess
             duplicated = true;
         }
     }
+    fclose(file); // Closes file
     
-    if(std::atoi(trial_number) == trials && duplicated) {
-        sprintf(response_buffer, "RTR OK\n");
+    if(std::atoi(trial_number) == trials && !strcmp(old_guess, new_guess)) { 
+        sprintf(response_buffer, "RTR OK\n");   // resend
+        return 0;
     }
-    else if (std::atoi(trial_number) != trials + 1) {
-        sprintf(response_buffer, "RTR INV\n");
+    else if (std::atoi(trial_number) != trials + 1) {                           
+        sprintf(response_buffer, "RTR INV\n");  // invalid trial number
+        return 0;
     }
-    else {
-        sprintf(response_buffer, "RTR OK\n");
+    else if (duplicated) {                                                                   
+        sprintf(response_buffer, "RTR DUP\n");  // duplicated guess
+        return 0;
     }
 
-    fclose(file); // Fecha o ficheiro
-    //return false; // Não há guess duplicada
-
-
-
-
-    // testar a trial
-    // ler do ficheiro o codigo suposto de acertar
+    // valid trial, test it
     char color_code[5] = "RRRR";
     char guess[5];
     int verified_colors[4] = {false, false, false, false};

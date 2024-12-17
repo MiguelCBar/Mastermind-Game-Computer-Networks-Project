@@ -5,3 +5,15 @@
 - Diretoria do server tem que existir de momento para o GS funcionar
 - no verbose, quando se manda um comando para o cliente, é preciso também aparecer no terminal?
 - perguntar versão de C++
+
+
+
+
+- o que mandar quando o start da um erro do lado do server por exemplo?
+- diretoria pode ser assim?:
+    "sprintf(file_name, "./server/GAMES/GAME_%s.txt", plid);"
+    funciona com todos os players que testem??
+- verificações de erro na mensagem são antes ou depois de testar se um jogo está a decorrer?
+- shutdown nos ficheiros ou close chega?
+- tem mal abrir e fechar várias vezes os ficheiros?
+

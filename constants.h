@@ -11,6 +11,6 @@ const int ERROR = -1;
 const int PLID_SIZE = 6;
 const int GAME_WON = 1;
 const int HEADER_SIZE = 64;
-const int MAX_FILE_SIZE = 4096;
+const int MAX_FILE_SIZE = 2048;
 
 #endif

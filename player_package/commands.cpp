@@ -181,7 +181,7 @@ int show_trials(const char* sv_ip, const char* port, const char* plid) {
     ssize_t max_size = MAX_FILE_SIZE + HEADER_SIZE;
 
     /* while(total_bytes < max_size - 1) {
-
+   
         //ssize_t bytes_remaining = max_size - total_bytes;
 
         memset(aux_buffer, 0, sizeof(aux_buffer));
@@ -210,9 +210,31 @@ int show_trials(const char* sv_ip, const char* port, const char* plid) {
     //printf("response buffer: %s\n\n", response_buffer);
     return 0; */
 
-    while (true) {
+    memset(response_buffer, 0, sizeof(response_buffer));
+    while (max_size > 0) {
+        ssize_t bytes_read = read(fd, response_buffer + total_bytes, sizeof(response_buffer) - total_bytes);
+        if(bytes_read < 0) {
+            std::cerr << "Error while reading from TCP connection\n";
+            freeaddrinfo(res);
+            close(fd);
+            return 0;
+        }
+        if(bytes_read == 0) {
+            printf("saiu bem!\n");
+            break;
+        }
+        for(int i = 0; i < 300; i++) {
+            printf("b[%d]:%d", i, response_buffer[i]);
+        }
+        total_bytes += bytes_read;
+    }
+    printf("saiu do while: %s\n", response_buffer);
+
+
+    /* while (true) {
         memset(aux_buffer, 0, sizeof(aux_buffer));
-        ssize_t bytes_read = read(fd, response_, sizeof(response_buffer) - total_bytes);
+        ssize_t bytes_read = read(fd, aux_buffer, sizeof(aux_buffer) - total_bytes);
+        printf("aux buffer: %s\n", aux_buffer);
         if(bytes_read < 0) {
             std::cerr << "Error while reading from TCP connection\n";
             freeaddrinfo(res);
@@ -222,12 +244,15 @@ int show_trials(const char* sv_ip, const char* port, const char* plid) {
         aux_buffer[bytes_read] = '\0';
         strcpy(response_buffer + total_bytes, aux_buffer);
         total_bytes += bytes_read;
-        if(parseFileHeader(response_buffer, &file_size, cmd, status, file_name, &header_size)) {
+        printf("response_buffer fora do parser do header: %s\n", response_buffer);
+
+        if(containsChar(response_buffer, strlen(response_buffer), '\n')) {
+            sscanf(response_buffer, "%s %s %s %ld\n", cmd, status, file_name, &file_size);
             break;
         }
     }
     printf("cmd: %s\nstatus: %s\nfile name:%s\nfile size:%ld\n", cmd, status, file_name, file_size);
-
+    return 0; */
     if(file_size > MAX_FILE_SIZE) {
         std::cerr << "Fsize cannot be bigger than 2KiB (2x1024B)\n";
         return 0;
@@ -239,11 +264,13 @@ int show_trials(const char* sv_ip, const char* port, const char* plid) {
     if(!strcmp(status, "ACT") || !strcmp(status, "FIN")) {
 
         st_file = fopen(file_name, "w+");
-        
         bytes_remaining = total_bytes - header_size;
-        fwrite(response_buffer + header_size, 1, bytes_remaining, st_file);
+        fseek(st_file, 0, SEEK_END);
+        fwrite(response_buffer, 1, bytes_remaining, st_file);
+
         while(bytes_remaining < file_size) {
-            ssize_t bytes_read = read(fd, response_buffer + total_bytes, sizeof(response_buffer) - total_bytes);
+            memset(aux_buffer, 0, sizeof(aux_buffer));
+            ssize_t bytes_read = read(fd, aux_buffer, sizeof(aux_buffer) - total_bytes);
             if(bytes_read < 0) {
                 std::cerr << "Error while reading from TCP connection\n";
                 freeaddrinfo(res);
@@ -251,9 +278,10 @@ int show_trials(const char* sv_ip, const char* port, const char* plid) {
                 fclose(st_file);
                 return 0;
             }
-            fwrite(response_buffer + total_bytes, 1, bytes_read, st_file);
-            bytes_remaining += bytes_read;
+            aux_buffer[bytes_read] = '\0';
+            strcpy(response_buffer + total_bytes, aux_buffer);
             total_bytes += bytes_read;
+            fwrite(aux_buffer, 1, bytes_read, st_file);
         }
 
         std::cout << "Fname: " << file_name << "\n";
