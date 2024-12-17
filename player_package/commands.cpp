@@ -10,13 +10,14 @@
 
 #include "commands.h"
 #include "../utils.h"
+#include "../constants.h"
 
-#define SV_IP "127.0.0.1"
+/* #define SV_IP "127.0.0.1"
 #define PORT "58058" //58000 + GN, where GN is 58
 #define PLID_SIZE 6
 #define GAME_WON 1
 #define HEADER_SIZE 64
-#define MAX_FILE_SIZE 4096
+#define MAX_FILE_SIZE 4096 */
 
 
 int end_game(const char* sv_ip, const char* port, const char* plid) {

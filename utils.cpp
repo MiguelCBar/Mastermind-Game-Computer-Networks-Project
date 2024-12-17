@@ -1,4 +1,5 @@
 #include "utils.h"
+#include "constants.h"
 
 bool verifyPLID(const std::string& input) {
     // Verifica se tem exatamente 6 caracteres e todos são dígitos

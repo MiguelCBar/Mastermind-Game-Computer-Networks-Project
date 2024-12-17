@@ -7,21 +7,118 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <arpa/inet.h>
+#include <filesystem>
 
 #include <fstream>
 #include <ctime>
 #include <iomanip>
 
 #include "../utils.h"
+#include "../constants.h"
 
-#define PORT "58058" //58000 + GN, where GN is 58
+namespace fs = std::filesystem;
+
+/* #define PORT "58058" //58000 + GN, where GN is 58
 #define NOT_VERBOSE 2
 #define VERBOSE 3
 #define COLOR_NUMBER 6
-#define ERROR -1
+#define ERROR -1 */
 
 
 //provavelmente, falta mais close(tcp_socket) e close(udp_socket), nos erros
+
+
+int endGame(const char* plid, char* response_buffer, const char* finisher_mode) {
+
+    char player_directory[256], file_name[256], time_str[16], last_file_line[256], first_file_line[256];
+    time_t fulltime;                                         
+    struct tm* currentTime;
+
+    if(!verifyPLID(plid)) {
+        sprintf(response_buffer, "RSG ERR\n");
+        return ERROR;        
+    }
+
+    memset(file_name, 0, sizeof(file_name));
+    sprintf(file_name, "./server/GAMES/GAME_%s.txt", plid);
+    FILE* file = fopen(file_name, "r+");
+
+    if(!file) {
+        sprintf(response_buffer, "RSG NOK\n");
+        return 1;   
+    }
+    
+
+    memset(player_directory, 0, sizeof(player_directory));
+    sprintf(player_directory, "server/GAMES/%s", plid);
+
+    time(&fulltime);            // Current time in seconds since 1970
+    currentTime = gmtime(&fulltime);
+
+    long initialTime = fulltime;  // Time in seconds sin 1970
+
+    memset(time_str, 0, sizeof(time_str));
+    sprintf(time_str, "%04d%02d%02d_%02d%02d%02d",
+             currentTime->tm_year + 1900, currentTime->tm_mon + 1, currentTime->tm_mday,
+             currentTime->tm_hour, currentTime->tm_min, currentTime->tm_sec);
+
+
+    if(!fs::exists(player_directory)) {
+        if(!fs::create_directory(player_directory)) {
+            sprintf(response_buffer, "RSG ERR\n");
+            return ERROR;   
+        }
+    }
+    char new_file_name[256];
+    memset(new_file_name, 0, sizeof(new_file_name));
+    sprintf(new_file_name, "%s/%s_%s.txt",player_directory, time_str, finisher_mode);
+    fs::path old_path = file_name;
+    fs::path new_path = new_file_name;
+    fclose(file);
+    fs::rename(old_path, new_path);
+
+
+    memset(first_file_line, 0, sizeof(first_file_line));
+    file = fopen(new_file_name, "r+");
+    if(!file) {
+        sprintf(response_buffer, "RSG ERR\n");
+        return 1;   
+    }
+    fseek(file, 0, SEEK_SET);
+    if(fgets(first_file_line, sizeof(first_file_line), file) == NULL) {
+        sprintf(response_buffer, "RSG ERR\n");
+        return ERROR;  
+    }
+
+    struct tm initial_tm;
+    int year, month, day, hours, minutes, seconds, max_game_time;
+    sscanf(first_file_line + 17, "%04d-%02d-%02d %02d:%02d:%02d %d\n", &year, &month, &day, &hours, &minutes, &seconds, &max_game_time);
+
+    initial_tm.tm_year = year - 1900;
+    initial_tm.tm_mon = month - 1;
+    initial_tm.tm_mday = day;
+    initial_tm.tm_hour = hours;
+    initial_tm.tm_min = minutes;
+    initial_tm.tm_sec = seconds;
+
+    time_t initial_time = mktime(&initial_tm);
+    time_t current_time = time(NULL);
+    int game_duration = (int)difftime(current_time, initial_time);
+
+    if(game_duration > max_game_time) {game_duration = max_game_time;}
+
+    memset(last_file_line, 0, sizeof(last_file_line));
+    sprintf(last_file_line, "%04d-%02d-%02d %02d:%02d:%02d %d\n",
+             currentTime->tm_year + 1900, currentTime->tm_mon + 1, currentTime->tm_mday,
+             currentTime->tm_hour, currentTime->tm_min, currentTime->tm_sec, game_duration);
+
+    fseek(file, 0, SEEK_END);
+    fwrite(last_file_line, 1, strlen(last_file_line), file);
+
+    fclose(file);
+    return 1;
+}
+
 
 int startGame(const char* plid, const char* max_playtime, const char* mode, const char* c1, const char* c2, const char* c3, const char* c4, char* response_buffer) {
 
@@ -29,6 +126,8 @@ int startGame(const char* plid, const char* max_playtime, const char* mode, cons
     struct tm* currentTime;
     char first_file_line[128], file_name[64], time_str[20], buffer[128];
     char color_code[5]; // 4 chars + null terminator
+
+    memset(response_buffer, 0, sizeof(response_buffer));
 
     if(!verifyPLID(plid) || !verifyMaxPlaytime(max_playtime)) {
         sprintf(response_buffer, "RSG ERR\n");
@@ -41,9 +140,12 @@ int startGame(const char* plid, const char* max_playtime, const char* mode, cons
     }
     
     // File name
+    memset(file_name, 0, sizeof(file_name));
     sprintf(file_name, "./server/GAMES/GAME_%s.txt", plid);
     FILE* file = fopen(file_name, "r");
 
+
+    memset(buffer, 0, sizeof(buffer));
     if (file) {
         fgets(buffer, sizeof(buffer), file);
         if (fgets(buffer, sizeof(buffer), file) != NULL) {
@@ -77,6 +179,7 @@ int startGame(const char* plid, const char* max_playtime, const char* mode, cons
 
     long initialTime = fulltime;  // Time in seconds sin 1970
 
+    memset(time_str, 0, sizeof(time_str));
     sprintf(time_str, "%04d-%02d-%02d %02d:%02d:%02d",
              currentTime->tm_year + 1900, currentTime->tm_mon + 1, currentTime->tm_mday,
              currentTime->tm_hour, currentTime->tm_min, currentTime->tm_sec);
@@ -88,7 +191,7 @@ int startGame(const char* plid, const char* max_playtime, const char* mode, cons
         return ERROR;
     }
 
-    // First line of the file
+    memset(first_file_line, 0, sizeof(first_file_line));
     sprintf(first_file_line, "%s %s %s %s %s %ld", plid, mode, color_code, max_playtime, time_str, initialTime);
     fprintf(file, "%s\n", first_file_line);
 

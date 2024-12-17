@@ -1,0 +1,7 @@
+- Perguntar como é que devemos tratar erros quando o servidor manda só "ERR", do lado do client
+- Devemos aceitar PLID do género 000001?
+- TCP do lado do player não está a ler bem
+- Mudar do lado do player para mandar sempre com 050 segundos em vez de 50
+- Diretoria do server tem que existir de momento para o GS funcionar
+- no verbose, quando se manda um comando para o cliente, é preciso também aparecer no terminal?
+- perguntar versão de C++

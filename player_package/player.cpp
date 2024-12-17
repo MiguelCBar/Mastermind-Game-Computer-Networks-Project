@@ -2,11 +2,12 @@
 #include <cstring>
 
 #include "commands.h"
+#include "../constants.h"
 
-#define SV_IP "127.0.0.1"
+/* #define SV_IP "127.0.0.1"
 #define PORT "58058" //58000 + GN, where GN is 58
 #define PLID_SIZE 6
-#define GAME_WON 1
+#define GAME_WON 1 */
 
 #include "commands.h"
 

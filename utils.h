@@ -9,6 +9,4 @@ bool parseFileHeader(const std::string& response_buffer, ssize_t* file_size, cha
 bool verifyColor(const std::string& color);
 void generateColorCode(char* color_code);
 
-
-
 #endif

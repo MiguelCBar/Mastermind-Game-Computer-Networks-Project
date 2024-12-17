@@ -13,7 +13,7 @@ GS_SRC = server/GS.cpp
 
 # Object files for each executable
 PLAYER_OBJ = player_package/player.o player_package/commands.o utils.o
-GS_OBJ = server/GS.o
+GS_OBJ = server/GS.o utils.o
 
 # Default target to build all executables
 all: $(TARGETS)
