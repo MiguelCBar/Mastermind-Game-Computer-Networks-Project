@@ -125,7 +125,7 @@ int show_trials(const char* sv_ip, const char* port, const char* plid) {
     //socklen_t addrlen;
     struct addrinfo hints, *res;
     //struct sockaddr_in addr;
-    char request_buffer[256], response_buffer[MAX_FILE_SIZE + HEADER_SIZE];
+    char request_buffer[256], response_buffer[MAX_FILE_SIZE + HEADER_SIZE], aux_buffer[MAX_FILE_SIZE + HEADER_SIZE];
 
     FILE *st_file;
     ssize_t file_size;
@@ -179,47 +179,54 @@ int show_trials(const char* sv_ip, const char* port, const char* plid) {
     total_bytes = 0;
     ssize_t header_size = HEADER_SIZE;
     ssize_t max_size = MAX_FILE_SIZE + HEADER_SIZE;
-    int i = 1;
-    while(total_bytes < max_size) {
 
-        ssize_t bytes_remaining = max_size - total_bytes;
-        char* current_pointer = response_buffer + total_bytes;
+    /* while(total_bytes < max_size - 1) {
 
-        printf("bytes remaining: %ld\ncurrent pointer: %s", bytes_remaining, *current_pointer);
+        //ssize_t bytes_remaining = max_size - total_bytes;
 
-        ssize_t bytes_read = read(fd, current_pointer, bytes_remaining);
-        printf("loop: %d\nresponse buffer dentro do while: %s\nbytes read: %ld\n\n", i, response_buffer, bytes_read);
-        if(bytes_read < 0) {
-            std::cerr << "Error while reading from TCP connection\n";
-            freeaddrinfo(res);
-            close(fd);
-            return 0;
-        }
+        memset(aux_buffer, 0, sizeof(aux_buffer));
+        ssize_t bytes_read = read(fd, aux_buffer, sizeof(aux_buffer));
+        printf("bytes read: %ld\taux buffer: %s\n", bytes_read, aux_buffer);
+
         if (bytes_read == 0) {
             std::cout << "Conection terminated by peer.\n";
             break;
         }
-        total_bytes += bytes_read;
-        response_buffer[total_bytes] = '\0';
-        i++;
-    }
-    printf("response buffer: %s\n\n", response_buffer);
-    return 0;
 
-    /* while (true) {
-        ssize_t bytes_read = read(fd, response_buffer + total_bytes, sizeof(response_buffer) - total_bytes);
+        else if(bytes_read < 0) {
+            if (errno == ECONNRESET) {
+                break;
+            }
+            std::cerr << "Error while reading from TCP connection\n";
+            freeaddrinfo(res);
+            close(fd);
+            return 0;
+        }
+        aux_buffer[bytes_read] = '\0';
+        strcpy(response_buffer + total_bytes, aux_buffer);
+        total_bytes += bytes_read;
+    }
+    response_buffer[total_bytes] = '\0';
+    //printf("response buffer: %s\n\n", response_buffer);
+    return 0; */
+
+    while (true) {
+        memset(aux_buffer, 0, sizeof(aux_buffer));
+        ssize_t bytes_read = read(fd, response_, sizeof(response_buffer) - total_bytes);
         if(bytes_read < 0) {
             std::cerr << "Error while reading from TCP connection\n";
             freeaddrinfo(res);
             close(fd);
             return 0;
         }
+        aux_buffer[bytes_read] = '\0';
+        strcpy(response_buffer + total_bytes, aux_buffer);
         total_bytes += bytes_read;
         if(parseFileHeader(response_buffer, &file_size, cmd, status, file_name, &header_size)) {
             break;
         }
     }
-    printf("cmd: %s\nstatus: %s\nfile name:%s\nfile size:%ld\n", cmd, status, file_name, file_size); */
+    printf("cmd: %s\nstatus: %s\nfile name:%s\nfile size:%ld\n", cmd, status, file_name, file_size);
 
     if(file_size > MAX_FILE_SIZE) {
         std::cerr << "Fsize cannot be bigger than 2KiB (2x1024B)\n";

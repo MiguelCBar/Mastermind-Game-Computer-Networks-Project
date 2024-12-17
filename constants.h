@@ -13,6 +13,4 @@ const int GAME_WON = 1;
 const int HEADER_SIZE = 64;
 const int MAX_FILE_SIZE = 4096;
 
-namespace fs = std::filesystem;
-
 #endif

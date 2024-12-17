@@ -43,9 +43,9 @@ int endGame(const char* plid, char* response_buffer, const char* finisher_mode) 
     sprintf(file_name, "./server/GAMES/GAME_%s.txt", plid);
     FILE* file = fopen(file_name, "r+");
 
-    if(!file) {
+    if(!file) { //verify if game does not exist
         sprintf(response_buffer, "RSG NOK\n");
-        return 1;   
+        return 0;   
     }
     
 
@@ -82,7 +82,7 @@ int endGame(const char* plid, char* response_buffer, const char* finisher_mode) 
     file = fopen(new_file_name, "r+");
     if(!file) {
         sprintf(response_buffer, "RSG ERR\n");
-        return 1;   
+        return ERROR;   
     }
     fseek(file, 0, SEEK_SET);
     if(fgets(first_file_line, sizeof(first_file_line), file) == NULL) {
@@ -92,18 +92,11 @@ int endGame(const char* plid, char* response_buffer, const char* finisher_mode) 
 
     struct tm initial_tm;
     int year, month, day, hours, minutes, seconds, max_game_time;
-    sscanf(first_file_line + 17, "%04d-%02d-%02d %02d:%02d:%02d %d\n", &year, &month, &day, &hours, &minutes, &seconds, &max_game_time);
+    time_t start_time;
+    sscanf(first_file_line + 15, "%03d %*04d-%*02d-%*02d %*02d:%*02d:%*02d %ld", &max_game_time, &start_time);
 
-    initial_tm.tm_year = year - 1900;
-    initial_tm.tm_mon = month - 1;
-    initial_tm.tm_mday = day;
-    initial_tm.tm_hour = hours;
-    initial_tm.tm_min = minutes;
-    initial_tm.tm_sec = seconds;
-
-    time_t initial_time = mktime(&initial_tm);
     time_t current_time = time(NULL);
-    int game_duration = (int)difftime(current_time, initial_time);
+    int game_duration = (int)difftime(current_time, start_time); // VERIFICAR SE É PRECISO PPASSAR O START TIME PARA TIME PORQUE FOI LIDO COM %ld
 
     if(game_duration > max_game_time) {game_duration = max_game_time;}
 
