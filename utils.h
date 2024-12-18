@@ -10,6 +10,7 @@ bool parseFileHeader(const std::string& response_buffer, ssize_t* file_size, cha
 bool validColor(const std::string& color);
 void generateColorCode(char* color_code);
 bool gameOn(const char* plid);
+int getTimePassed(const char* plid);
 int timeExceeded(const char* plid);
 
 #endif

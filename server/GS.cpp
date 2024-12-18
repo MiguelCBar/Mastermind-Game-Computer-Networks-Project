@@ -245,6 +245,7 @@ int testTrial(const char* plid, const char* c1, const char* c2, const char* c3, 
         return ERROR;
     }
 
+
     // valid trial, test it
     char color_code[5] = "RRRR";
     char guess[5];
@@ -276,7 +277,18 @@ int testTrial(const char* plid, const char* c1, const char* c2, const char* c3, 
     else if (trials == 7){
         endGame(plid, 'F');
     }
-    sprintf(response_buffer, "RTR OK %s %s %s\n", new_trial_number, nB, nW);  // duplicated guess
+    sprintf(response_buffer + 4, "OK %s %s %s\n", new_trial_number, nB, nW);    // create response to player
+
+    char trial_line[128];
+    memset(trial_line, 0, sizeof(trial_line));
+    int time_passed = getTimePassed(plid);
+    sprintf(trial_line, "T: %s%s%s%s", c1, c2, c3, c4, nB, nW, time_passed);    // create trial line
+
+    // Append new try to the game file
+    FILE* file = fopen(file_name, "a");
+    if (!file) {return ERROR;}      // ERROR a abrir ficheiro
+    fprintf(file, "%s\n", trial_line);
+    fclose(file);
     return 1;
 }
 

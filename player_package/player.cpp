@@ -108,7 +108,12 @@ int main(int argc, char* argv[]) {
                         if (try_status == GAME_WON || try_status == GAME_END) {          
                             active_game = false;
                         }
-                        else if(try_status == ERROR)
+                        else if(try_status == ERROR){
+                            // MIKE DO SOMETHING
+                            //
+                            //
+                            //
+                        }
                     } else {
                         std::cout << "You do not have an ongoing game\n";
                     }

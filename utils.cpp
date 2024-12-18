@@ -95,7 +95,7 @@ int getTimePassed(const char* plid) {
 
     int max_game_time, game_duration;
     time_t start_time;
-    sscanf(first_file_line + 15, "%*03d %*04d-%*02d-%*02d %*02d:%*02d:%*02d %ld", &max_game_time, &start_time);
+    sscanf(first_file_line + 15, "%03d %*04d-%*02d-%*02d %*02d:%*02d:%*02d %ld", &max_game_time, &start_time);
 
     time_t current_time = time(NULL);
     game_duration = (int)difftime(current_time, start_time); // VERIFICAR SE É PRECISO PASSAR O START TIME PARA TIME PORQUE FOI LIDO COM %ld
