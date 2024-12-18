@@ -4,13 +4,6 @@
 #include "commands.h"
 #include "../constants.h"
 
-/* #define SV_IP "127.0.0.1"
-#define PORT "58058" //58000 + GN, where GN is 58
-#define PLID_SIZE 6
-#define GAME_WON 1 */
-
-#include "commands.h"
-
 int main(int argc, char* argv[]) {
 
     int num_args, nT, active_game = false;
@@ -28,7 +21,7 @@ int main(int argc, char* argv[]) {
             } else if (std::string(argv[1]) == "-p") {
                 port = argv[2];
             } else {
-                std::cerr << "Error in writing arguments, the correct structure is as follows: ./player [-n GSIP] [-p GSport]\n";
+                std::cerr << "ERROR: failed to write arguments, the correct structure is as follows: ./player [-n GSIP] [-p GSport]\n";
                 exit(1);
             }
             break;
@@ -38,24 +31,24 @@ int main(int argc, char* argv[]) {
                 sv_ip = argv[2];
                 port = argv[4];
             } else {
-                std::cerr << "Error in writing arguments, the correct structure is as follows: ./player [-n GSIP] [-p GSport]\n";
+                std::cerr << "ERROR: failed to write arguments, the correct structure is as follows: ./player [-n GSIP] [-p GSport]\n";
                 exit(1);
             }
             break;
 
         default:
-            std::cerr << "Error in writing arguments, the correct structure is as follows: ./player [-n GSIP] [-p GSport]\n";
+            std::cerr << "ERROR: failed to write arguments, the correct structure is as follows: ./player [-n GSIP] [-p GSport]\n";
             exit(1);
     }
 
 
     //No while, falta verificar mensagens de ERR, não sei se é suposto acabar o programa ou só dizer que foi um return invalido
+    std::cout << "\nHELLO Good sir! I see you want to play the MASTERMIND game.\nLets hop right into it!\n\n";
     while(true) {
 
         std::string input;
         char plid[32], cmd[32], arg1[32], arg2[32], arg3[32], arg4[32], arg5[32], arg6[32], extra[32];
-        //le comando
-        std::cout << "Command: ";
+        std::cout << "COMMAND -> ";
         std::getline(std::cin, input);
 
         num_args = sscanf(input.c_str(), "%s %s %s %s %s %s %s %s\n", cmd, arg1, arg2, arg3, arg4, arg5, arg6, extra);
@@ -64,7 +57,7 @@ int main(int argc, char* argv[]) {
 
                 if (!strcmp(cmd, "quit")){
                     if (active_game) {
-                        if(end_game(sv_ip, port, plid)) {
+                        if(end_game(sv_ip, port, plid) != ERROR) {
                             active_game = false;
                             nT = 1;
                         }
