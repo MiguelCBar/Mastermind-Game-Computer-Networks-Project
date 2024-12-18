@@ -13,9 +13,9 @@ const int GAME_WON = 1;
 const int HEADER_SIZE = 64;
 const int MAX_FILE_SIZE = 2048;
 
-const char WIN[2] = "W";
-const char FAIL[2] = "F";
-const char QUIT[2] = "Q";
-const char TIMEOUT[2] = "T";
+const char WIN = 'W';
+const char FAIL = 'F';
+const char QUIT = 'Q';
+const char TIMEOUT = 'T';
 
 #endif

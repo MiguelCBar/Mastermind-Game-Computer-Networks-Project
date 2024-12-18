@@ -129,7 +129,7 @@ int show_trials(const char* sv_ip, const char* port, const char* plid) {
 
     FILE *st_file;
     ssize_t file_size;
-    char cmd[32], status[32], file_name[128];
+    char status[32], file_name[128];
 
     // Create the socket
     fd = socket(AF_INET, SOCK_STREAM, 0); // TCP socket

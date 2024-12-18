@@ -1,6 +1,7 @@
 #include "utils.h"
 #include "constants.h"
 #include <fstream>
+#include <string.h>
 
 bool validPLID(const std::string& input) {
     // Verifica se tem exatamente 6 caracteres e todos são dígitos
@@ -38,7 +39,7 @@ bool containsChar(const char* buffer, size_t size, char target) {
     }
     return false;
 }
-
+/* 
 bool parseFileHeader(const std::string& response_buffer, ssize_t* file_size, char* cmd, char* status, char* file_name, ssize_t* headersize) {
     char f_size[32];
     int num_args;
@@ -46,9 +47,9 @@ bool parseFileHeader(const std::string& response_buffer, ssize_t* file_size, cha
     (*headersize) = response_buffer.find('\n');
     if(*headersize != std::string::npos) {
         sscanf(response_buffer.c_str(), "%s %s %s %s", cmd, status, file_name, f_size);
-        /* if(num_args != 4 ) {
+        if(num_args != 4 ) {
             return false;
-        } */
+        } 
         *file_size = std::strtol(f_size, nullptr, 10);
         (*headersize)++;
         return true;
@@ -56,7 +57,7 @@ bool parseFileHeader(const std::string& response_buffer, ssize_t* file_size, cha
     //printf("ta mal: %s\n", c);
     return false;
 }
-
+ */
 bool validColor(const std::string& color) {
     std::string validColors = "RGBYOP";
     return color.length() == 1 && validColors.find(color) != std::string::npos;
@@ -76,6 +77,30 @@ bool gameOn(const char* plid) {
         }
 }
 
+int timeExceeded(const char* plid) {
+
+    FILE* file;
+    char first_file_line[256], file_name[64];
+
+    memset(file_name, 0, sizeof(file_name));
+    sprintf(file_name, "./server/GAMES/GAME_%s.txt", plid);
+
+    file = fopen(file_name, "r");
+    if(!file) {return ERROR;}
+    
+    memset(first_file_line, 0, sizeof(first_file_line));
+    if(fgets(first_file_line, sizeof(first_file_line), file) == NULL) {return ERROR;}
+
+    int max_game_time, game_duration;
+    time_t start_time;
+    sscanf(first_file_line + 15, "%03d %*04d-%*02d-%*02d %*02d:%*02d:%*02d %ld", &max_game_time, &start_time);
+
+    time_t current_time = time(NULL);
+    game_duration = (int)difftime(current_time, start_time); // VERIFICAR SE É PRECISO PASSAR O START TIME PARA TIME PORQUE FOI LIDO COM %ld
+
+    return max_game_time < game_duration;
+}
+
 
 void generateColorCode(char* color_code) {
     const char colors[] = "RGBYOP";
@@ -84,4 +109,5 @@ void generateColorCode(char* color_code) {
     }
     color_code[4] = '\0'; // Add the '\0' character
 }
+
 

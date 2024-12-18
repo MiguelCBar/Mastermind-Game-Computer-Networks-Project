@@ -16,115 +16,112 @@
 #include "../utils.h"
 #include "../constants.h"
 
-namespace fs = std::filesystem;
-
 //provavelmente, falta mais close(tcp_socket) e close(udp_socket), nos erros
+
+int endGame(const char* plid, const char finisher_mode) {
+
+    char player_directory[256], file_name[256], time_str[16], file_line[256];
+    time_t fulltime;                                         
+
+    // get file name
+    memset(file_name, 0, sizeof(file_name));
+    sprintf(file_name, "./server/GAMES/GAME_%s.txt", plid);
+
+    /*ADD LAST LINE TO THE PLAYER FILE*/
+    memset(file_line, 0, sizeof(file_line));
+    FILE* file = fopen(file_name, "r+");
+    if(!file) {
+        return ERROR;   
+    }
+    // get first line
+    fseek(file, 0, SEEK_SET);
+    if(fgets(file_line, sizeof(file_line), file) == NULL) {
+        return ERROR;  
+    }
+
+    // get game start time
+    int max_game_time;
+    time_t start_time;
+    sscanf(file_line + 15, "%03d %*04d-%*02d-%*02d %*02d:%*02d:%*02d %ld", &max_game_time, &start_time);
+
+    time_t current_time_seconds = time(NULL);
+    int game_duration = (int)difftime(current_time_seconds, start_time);
+
+    // calculate final game duration
+    if(game_duration > max_game_time) {game_duration = max_game_time;}
+
+    // define last line
+    time(&fulltime);                // Current time in seconds since 1970
+    struct tm* current_time = gmtime(&fulltime);
+
+    long initialTime = fulltime;    // Time in seconds since 1970
+    memset(file_line, 0, sizeof(file_line));
+    sprintf(file_line, "%04d-%02d-%02d %02d:%02d:%02d %d\n",
+             current_time->tm_year + 1900, current_time->tm_mon + 1, current_time->tm_mday,
+             current_time->tm_hour, current_time->tm_min, current_time->tm_sec, game_duration);
+
+    fseek(file, 0, SEEK_END);                           // go to the end of the file
+    fwrite(file_line, 1, strlen(file_line), file);      // write last line
+    fclose(file);                                       // close file
+
+
+    /*CHANGE PLAYER DIRECTORY PATH*/
+    namespace fs = std::filesystem;
+
+    //define player directory path
+    memset(player_directory, 0, sizeof(player_directory));
+    sprintf(player_directory, "server/GAMES/%s", plid);
+
+    if(!fs::exists(player_directory)) {
+        if(!fs::create_directory(player_directory)) {
+            //ERRO
+            return ERROR;
+        }
+    }
+    memset(time_str, 0, sizeof(time_str));
+    sprintf(time_str, "%04d%02d%02d_%02d%02d%02d",
+             current_time->tm_year + 1900, current_time->tm_mon + 1, current_time->tm_mday,
+             current_time->tm_hour, current_time->tm_min, current_time->tm_sec);
+
+    // define new path of the file
+    char new_file_name[256];
+    memset(new_file_name, 0, sizeof(new_file_name));
+    sprintf(new_file_name, "%s/%s_%c.txt", player_directory, time_str, finisher_mode);
+    fs::path new_path = new_file_name;
+
+    fs::path old_path = file_name;
+
+    // rename file path and the player filename and move it to the new directory (./server/GAMES/PLID/file_name.txt)
+    fs::rename(old_path, new_path);
+
+    return 1;
+}
+
+
+
 int handlerQuitCommand(const char* plid, char* response_buffer) {
+
     FILE* file;
     char file_name[64];
+
     if(!validPLID(plid)) {
         sprintf(response_buffer, "RQT ERR\n");
         return ERROR;
     }
-    if(gameOn(plid)) {
-        if(timeExceeded(plid)) {
-            endGame(plid, TIMEOUT);
-            sprintf(response_buffer, "RQT NOK\n");
-        }
-        endGame(plid, QUIT);
-        sprintf(response_buffer, "RQT OK\n");
-
+    if(!gameOn(plid)) {
+        sprintf(response_buffer, "RQT NOK\n");      // not in a game, cant quit
+        return 0;
     }
-    else {
-        sprintf(response_buffer, "RQT NOK\n");
+    if(timeExceeded(plid)) {
+        endGame(plid, TIMEOUT);
+        sprintf(response_buffer, "RQT NOK\n");      // not in a game, already timed out
+        return 0;
     }
-    return 0;
-}
-
-
-
-int endGame(const char* plid, const char* finisher_mode) {
-
-    char player_directory[256], file_name[256], time_str[16], last_file_line[256], first_file_line[256];
-    time_t fulltime;                                         
-    struct tm* currentTime;
-
-/*     if(!validPLID(plid)) {
-        sprintf(response_buffer, "RSG ERR\n");
-        return ERROR;        
-    } */
-
-    memset(file_name, 0, sizeof(file_name));
-    sprintf(file_name, "./server/GAMES/GAME_%s.txt", plid);
-    FILE* file = fopen(file_name, "r+");
-
-    if(!file) {
-        //ERRO
-        return ERROR;   
-    }
-    
-    memset(player_directory, 0, sizeof(player_directory));
-    sprintf(player_directory, "server/GAMES/%s", plid);
-
-    time(&fulltime);            // Current time in seconds since 1970
-    currentTime = gmtime(&fulltime);
-
-    long initialTime = fulltime;  // Time in seconds sin 1970
-
-    memset(time_str, 0, sizeof(time_str));
-    sprintf(time_str, "%04d%02d%02d_%02d%02d%02d",
-             currentTime->tm_year + 1900, currentTime->tm_mon + 1, currentTime->tm_mday,
-             currentTime->tm_hour, currentTime->tm_min, currentTime->tm_sec);
-
-
-    if(!fs::exists(player_directory)) {
-        if(!fs::create_directory(player_directory)) {
-            sprintf(response_buffer, "RSG ERR\n");
-            return ERROR;   
-        }
-    }
-    char new_file_name[256];
-    memset(new_file_name, 0, sizeof(new_file_name));
-    sprintf(new_file_name, "%s/%s_%s.txt",player_directory, time_str, finisher_mode);
-    fs::path old_path = file_name;
-    fs::path new_path = new_file_name;
-    fclose(file);
-    fs::rename(old_path, new_path);
-
-
-    memset(first_file_line, 0, sizeof(first_file_line));
-    file = fopen(new_file_name, "r+");
-    if(!file) {
-        sprintf(response_buffer, "RSG ERR\n");
-        return ERROR;   
-    }
-    fseek(file, 0, SEEK_SET);
-    if(fgets(first_file_line, sizeof(first_file_line), file) == NULL) {
-        sprintf(response_buffer, "RSG ERR\n");
-        return ERROR;  
-    }
-
-    struct tm initial_tm;
-    int year, month, day, hours, minutes, seconds, max_game_time;
-    time_t start_time;
-    sscanf(first_file_line + 15, "%03d %*04d-%*02d-%*02d %*02d:%*02d:%*02d %ld", &max_game_time, &start_time);
-
-    time_t current_time = time(NULL);
-    int game_duration = (int)difftime(current_time, start_time); // VERIFICAR SE É PRECISO PASSAR O START TIME PARA TIME PORQUE FOI LIDO COM %ld
-
-    if(game_duration > max_game_time) {game_duration = max_game_time;}
-
-    memset(last_file_line, 0, sizeof(last_file_line));
-    sprintf(last_file_line, "%04d-%02d-%02d %02d:%02d:%02d %d\n",
-             currentTime->tm_year + 1900, currentTime->tm_mon + 1, currentTime->tm_mday,
-             currentTime->tm_hour, currentTime->tm_min, currentTime->tm_sec, game_duration);
-
-    fseek(file, 0, SEEK_END);
-    fwrite(last_file_line, 1, strlen(last_file_line), file);
-
-    fclose(file);
+    endGame(plid, QUIT);
+    sprintf(response_buffer, "RQT OK\n");           // game on, quit game
     return 1;
 }
+
 
 
 int startGame(const char* plid, const char* max_playtime, const char* mode, const char* c1, const char* c2, const char* c3, const char* c4, char* response_buffer) {
@@ -134,27 +131,30 @@ int startGame(const char* plid, const char* max_playtime, const char* mode, cons
     char first_file_line[128], file_name[64], time_str[20], buffer[128];
     char color_code[5]; // 4 chars + null terminator
     FILE* fd;
-
+    
     memset(response_buffer, 0, sizeof(response_buffer));
+    if(!strcmp(mode, "P")) {sprintf(response_buffer, "RSG ");}   // normal game mode
+    else {sprintf(response_buffer, "RDB ");}                     // debug game mode
+
     if(!validPLID(plid) || !verifyMaxPlaytime(max_playtime)) {
-        sprintf(response_buffer, "RSG ERR\n");
+        sprintf(response_buffer + 4, "ERR\n");
         return ERROR;
     }
-    // debug mode
     if(!strcmp(mode, "D") && (!validColor(c1) || !validColor(c2) || !validColor(c3) || !validColor(c4))) {
-        sprintf(response_buffer, "RSG ERR\n");
+        sprintf(response_buffer + 4, "ERR\n");
         return ERROR;
     }
+
+    // define file name
     memset(file_name, 0, sizeof(file_name));
     sprintf(file_name, "./server/GAMES/GAME_%s.txt", plid);
     FILE* file = fopen(file_name, "r");
 
-    memset(buffer, 0, sizeof(buffer));              // clean buffer
-
-    fgets(buffer, sizeof(buffer), file);            // ignore first line
+    memset(buffer, 0, sizeof(buffer));                  // clean buffer
+    fgets(buffer, sizeof(buffer), file);                // ignore first line
     if (fgets(buffer, sizeof(buffer), file) != NULL) {
         fclose(file);
-        sprintf(response_buffer, "RSG NOK\n");      // already has a game going
+        sprintf(response_buffer + 4, "NOK\n");          // already has a game going
         return 0;
     }
     fclose(file);
@@ -189,7 +189,7 @@ int startGame(const char* plid, const char* max_playtime, const char* mode, cons
     // Create the file
     file = fopen(file_name, "w");
     if (!file) {
-        sprintf(response_buffer, "RSG ERR\n");
+        sprintf(response_buffer + 4, "ERR\n");
         return ERROR;
     }
 
@@ -197,7 +197,7 @@ int startGame(const char* plid, const char* max_playtime, const char* mode, cons
     sprintf(first_file_line, "%s %s %s %s %s %ld", plid, mode, color_code, max_playtime, time_str, initialTime);
     fprintf(file, "%s\n", first_file_line);
 
-    sprintf(response_buffer, "RSG OK\n");
+    sprintf(response_buffer + 4, "OK\n");
     fclose(file);
     return 1;
 }
@@ -210,12 +210,12 @@ int testTrial(const char* plid, const char* c1, const char* c2, const char* c3, 
         return ERROR;
     }
     if (!gameOn(plid)) {    // does not have a game going
-        sprintf(response_buffer, "RSG NOK\n");
+        sprintf(response_buffer, "RTR NOK\n");
         return 0;
     }
     if (timeExceeded(plid)) {
-        endGame(plid); // TESTAR ERROS
-        sprintf(response_buffer, "RSG ETM\n");
+        endGame(plid, TIMEOUT); // TESTAR ERROS
+        sprintf(response_buffer, "RTR ETM\n");
         return 0;
     }
 
@@ -292,7 +292,7 @@ int testTrial(const char* plid, const char* c1, const char* c2, const char* c3, 
 int resolveUDPCommands(const char* input, char* response_buffer) {
 
     int num_args;
-    char plid[32], cmd[32], arg1[32], arg2[32], arg3[32], arg4[32], arg5[32], arg6[32];
+    char cmd[32], arg1[32], arg2[32], arg3[32], arg4[32], arg5[32], arg6[32];
 
     num_args = sscanf(input, "%s %s %s %s %s %s %s\n", cmd, arg1, arg2, arg3, arg4, arg5, arg6);
 
@@ -308,8 +308,8 @@ int resolveUDPCommands(const char* input, char* response_buffer) {
             else {
                 std::cerr << "Communication error.\n";
             }
+            break;
             
-
         case 3:
             if (!strcmp(cmd, "SNG")){
                 if(!startGame(arg1, arg2, "P", arg3, arg4, arg5, arg6, response_buffer)){
@@ -339,8 +339,6 @@ int resolveUDPCommands(const char* input, char* response_buffer) {
     }
     return 0;
 }
-
-
 
 
 int main(int argc, char* argv[]) {
