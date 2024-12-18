@@ -455,7 +455,7 @@ int main(int argc, char* argv[]) {
                     
 
                     // Enviar resposta para o cliente
-                    if (sendto(udp_socket, buffer, n, 0, (struct sockaddr*)&addr, addrlen) == ERROR) {
+                    if (sendto(udp_socket, response_buffer, strlen(response_buffer), 0, (struct sockaddr*)&addr, addrlen) == ERROR) {
                         perror("sendto");
                         exit(1);
                     }
