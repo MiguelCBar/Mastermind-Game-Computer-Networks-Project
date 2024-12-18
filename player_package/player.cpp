@@ -43,12 +43,12 @@ int main(int argc, char* argv[]) {
 
 
     //No while, falta verificar mensagens de ERR, não sei se é suposto acabar o programa ou só dizer que foi um return invalido
-    std::cout << "\nHELLO Good sir! I see you want to play the MASTERMIND game.\nLets hop right into it!\n\n";
+    std::cout << "\nHELLO Good sir! I see you want to play the MASTERMIND game.\nLets hop right into it!\n";
     while(true) {
 
         std::string input;
         char plid[32], cmd[32], arg1[32], arg2[32], arg3[32], arg4[32], arg5[32], arg6[32], extra[32];
-        std::cout << "COMMAND -> ";
+        std::cout << "\nCOMMAND -> ";
         std::getline(std::cin, input);
 
         num_args = sscanf(input.c_str(), "%s %s %s %s %s %s %s %s\n", cmd, arg1, arg2, arg3, arg4, arg5, arg6, extra);
@@ -57,7 +57,7 @@ int main(int argc, char* argv[]) {
 
                 if (!strcmp(cmd, "quit")){
                     if (active_game) {
-                        if(end_game(sv_ip, port, plid) != ERROR) {
+                        if(commandEndGame(sv_ip, port, plid) == SUCCESS) {
                             active_game = false;
                             nT = 1;
                         }
@@ -69,19 +69,19 @@ int main(int argc, char* argv[]) {
                 }
                 else if (!strcmp(cmd, "exit")){
                     if(active_game) {
-                        end_game(sv_ip, port, plid);
+                        commandEndGame(sv_ip, port, plid);
                     }
                     return 0; //sair do programa
                 }
                 else if (!strcmp(cmd, "st") || !strcmp(cmd, "show_trials")) {
                     if (active_game) {
-                        show_trials(sv_ip, port, plid);
+                        commandShowTrials(sv_ip, port, plid);
                     } else {
                         std::cout << "You do not have an ongoing game\n";
                     }
                 }
                 else if (!strcmp(cmd, "sb") || !strcmp(cmd, "scoreboard")) {
-                    scoreboard(sv_ip, port);
+                    commandScoreBoard(sv_ip, port);
                 }
                 else {
                     std::cout << "Invalid command. Check cmd or number of arguments\n";
@@ -90,7 +90,7 @@ int main(int argc, char* argv[]) {
 
             case 3:
                 if(!strcmp(cmd, "start")) {
-                    if(start_game(sv_ip, port, arg1, arg2)){ 
+                    if(commandStartGame(sv_ip, port, arg1, arg2) == SUCCESS){ 
                         active_game = true;
                         nT = 1;
                         strncpy(plid, arg1, PLID_SIZE);
@@ -104,10 +104,11 @@ int main(int argc, char* argv[]) {
             case 5:
                 if(!strcmp(cmd, "try")) {
                     if (active_game) {
-                        if (try_command(sv_ip, port, arg1, arg2, arg3, arg4, &nT, plid) == GAME_WON) {
-                            
-                            //active_game = false; // MANDAR POINTER LA PRA DENTRO?????
+                        int try_status = commandTry(sv_ip, port, arg1, arg2, arg3, arg4, &nT, plid);
+                        if (try_status == GAME_WON || try_status == GAME_END) {          
+                            active_game = false;
                         }
+                        else if(try_status == ERROR)
                     } else {
                         std::cout << "You do not have an ongoing game\n";
                     }
@@ -119,7 +120,7 @@ int main(int argc, char* argv[]) {
 
             case 7:
                 if(!strcmp(cmd, "debug")) {
-                    if(debug_command(sv_ip, port, arg1, arg2, arg3, arg4, arg5, arg6)) {
+                    if(commandDebug(sv_ip, port, arg1, arg2, arg3, arg4, arg5, arg6)) {
                         active_game = true;
                         nT = 1;
                         strncpy(plid, arg1, PLID_SIZE);

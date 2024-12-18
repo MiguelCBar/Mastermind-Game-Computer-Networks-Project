@@ -128,9 +128,8 @@ int startGame(const char* plid, const char* max_playtime, const char* mode, cons
 
     time_t fulltime;                                         
     struct tm* currentTime;
-    char first_file_line[128], file_name[64], time_str[20], buffer[128];
+    char file_line[128], file_name[64], time_str[20], buffer[128];
     char color_code[5]; // 4 chars + null terminator
-    FILE* fd;
     
     memset(response_buffer, 0, sizeof(response_buffer));
     if(!strcmp(mode, "P")) {sprintf(response_buffer, "RSG ");}   // normal game mode
@@ -144,42 +143,36 @@ int startGame(const char* plid, const char* max_playtime, const char* mode, cons
         sprintf(response_buffer + 4, "ERR\n");
         return ERROR;
     }
-
     // define file name
     memset(file_name, 0, sizeof(file_name));
     sprintf(file_name, "./server/GAMES/GAME_%s.txt", plid);
-    FILE* file = fopen(file_name, "r");
 
-    memset(buffer, 0, sizeof(buffer));                  // clean buffer
-    fgets(buffer, sizeof(buffer), file);                // ignore first line
-    if (fgets(buffer, sizeof(buffer), file) != NULL) {
+    FILE* file = fopen(file_name, "r");     // open file in read mode
+    if(file) {
+        memset(file_line, 0, sizeof(file_line));
+        if(fgets(file_line, sizeof(file_line), file) == NULL) {return ERROR;}   // get header of the file
+
+        fgets(file_line, sizeof(file_line), file);
         fclose(file);
-        sprintf(response_buffer + 4, "NOK\n");          // already has a game going
-        return 0;
+        // checks if the game already has tries
+        if (file_line != NULL) {
+            if (!timeExceeded(plid)) {
+                sprintf(response_buffer + 4, "NOK\n");
+                return 0;
+            }
+        }
     }
-    fclose(file);
-    /* char existing_plid[6];
-    if (fscanf(file, "%s", existing_plid)) {
-        if (!strcmp(existing_plid, plid)) {
-            // game with plid already on course, close arquive and return
-            fclose(file);
-            printf("Game on course with same PLID: %s\n", existing_plid);
-            return 0; // Ou um código específico para indicar que não foi criado
-        } 
-    } */
     memset(color_code, 0, sizeof(color_code));      // clear color_code
     if (!strcmp(mode, "P")) {                       // normal game
-        generateColorCode(color_code);
+        generateColorCode(color_code);              // generates the color code
     }
     else {  // debug mode --> use color code requested by user
         sprintf(color_code, "%s%s%s%s", c1, c2, c3, c4);
     }
-    //printf(" ------------------- color code: %s\n", color_code);
 
-    time(&fulltime);            // Current time in seconds since 1970
+    time(&fulltime);                // Current time in seconds since 1970
     currentTime = gmtime(&fulltime);
-
-    long initialTime = fulltime;  // Time in seconds sin 1970
+    long initialTime = fulltime;    // Time in seconds sin 1970
 
     memset(time_str, 0, sizeof(time_str));
     sprintf(time_str, "%04d-%02d-%02d %02d:%02d:%02d",
@@ -188,11 +181,10 @@ int startGame(const char* plid, const char* max_playtime, const char* mode, cons
     
     // Create the file
     file = fopen(file_name, "w");
-    if (!file) {
-        sprintf(response_buffer + 4, "ERR\n");
-        return ERROR;
-    }
+    if (!file) {return ERROR;}      // ERROR a abrir ficheiro
 
+    // create first line of the file
+    char first_file_line[128];
     memset(first_file_line, 0, sizeof(first_file_line));
     sprintf(first_file_line, "%s %s %s %s %s %ld", plid, mode, color_code, max_playtime, time_str, initialTime);
     fprintf(file, "%s\n", first_file_line);
@@ -242,15 +234,15 @@ int testTrial(const char* plid, const char* c1, const char* c2, const char* c3, 
     
     if(std::atoi(new_trial_number) == trials && !strcmp(old_guess, new_guess)) { 
         sprintf(response_buffer, "RTR OK\n");   // resend
-        return 0;
+        return SUCCESS;
     }
     else if (std::atoi(new_trial_number) != trials + 1) {                           
         sprintf(response_buffer, "RTR INV\n");  // invalid trial number
-        return 0;
+        return ERROR;
     }
     else if (duplicated) {                                                                   
         sprintf(response_buffer, "RTR DUP\n");  // duplicated guess
-        return 0;
+        return ERROR;
     }
 
     // valid trial, test it
@@ -284,7 +276,7 @@ int testTrial(const char* plid, const char* c1, const char* c2, const char* c3, 
     else if (trials == 7){
         endGame(plid, 'F');
     }
-    sprintf(response_buffer, "RTR OK\n");  // duplicated guess
+    sprintf(response_buffer, "RTR OK %s %s %s\n", new_trial_number, nB, nW);  // duplicated guess
     return 1;
 }
 

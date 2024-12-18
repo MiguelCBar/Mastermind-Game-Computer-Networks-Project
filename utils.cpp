@@ -77,6 +77,37 @@ bool gameOn(const char* plid) {
         }
 }
 
+
+int getTimePassed(const char* plid) {
+
+    FILE* file;
+    char first_file_line[256], file_name[64];
+
+    memset(file_name, 0, sizeof(file_name));
+    sprintf(file_name, "./server/GAMES/GAME_%s.txt", plid);
+
+    file = fopen(file_name, "r");
+    if(!file) {return ERROR;}
+    
+    memset(first_file_line, 0, sizeof(first_file_line));
+    if(fgets(first_file_line, sizeof(first_file_line), file) == NULL) {return ERROR;}
+    fclose(file);
+
+    int max_game_time, game_duration;
+    time_t start_time;
+    sscanf(first_file_line + 15, "%*03d %*04d-%*02d-%*02d %*02d:%*02d:%*02d %ld", &max_game_time, &start_time);
+
+    time_t current_time = time(NULL);
+    game_duration = (int)difftime(current_time, start_time); // VERIFICAR SE É PRECISO PASSAR O START TIME PARA TIME PORQUE FOI LIDO COM %ld
+
+    if (max_game_time < game_duration) {
+        game_duration = max_game_time;
+    }
+
+    return game_duration;
+}
+
+
 int timeExceeded(const char* plid) {
 
     FILE* file;
@@ -90,6 +121,7 @@ int timeExceeded(const char* plid) {
     
     memset(first_file_line, 0, sizeof(first_file_line));
     if(fgets(first_file_line, sizeof(first_file_line), file) == NULL) {return ERROR;}
+    fclose(file);
 
     int max_game_time, game_duration;
     time_t start_time;
@@ -97,7 +129,6 @@ int timeExceeded(const char* plid) {
 
     time_t current_time = time(NULL);
     game_duration = (int)difftime(current_time, start_time); // VERIFICAR SE É PRECISO PASSAR O START TIME PARA TIME PORQUE FOI LIDO COM %ld
-    fclose(file);
 
     return max_game_time < game_duration;
 }

@@ -13,9 +13,9 @@
 #include "../constants.h"
 
 
-int end_game(const char* sv_ip, const char* port, const char* plid) {
+int commandEndGame(const char* sv_ip, const char* port, const char* plid) {
 
-    int fd, errcode, num_args, return_value;
+    int fd, errcode, num_args;
     ssize_t n;
     socklen_t addrlen;
     struct addrinfo hints, *res;
@@ -73,6 +73,7 @@ int end_game(const char* sv_ip, const char* port, const char* plid) {
         close(fd);
         return ERROR;
     }
+    int return_value;
     switch (num_args){
         case 2:
             if(!strcmp(status, "NOK")) {
@@ -91,7 +92,7 @@ int end_game(const char* sv_ip, const char* port, const char* plid) {
         case 6:
             if(!strcmp(status, "OK")) {
                 std::cout << "Game terminated. The color code was:\n\n\t### " << arg1 << " " << arg2 << " " << arg3 << " " << arg4 << " ###\n";
-                return_value = 1;
+                return_value = SUCCESS;
             }
             else {
                 std::cerr << "Communication error.\n";
@@ -110,7 +111,7 @@ int end_game(const char* sv_ip, const char* port, const char* plid) {
     return return_value;
 }
 
-int show_trials(const char* sv_ip, const char* port, const char* plid) {
+int commandShowTrials(const char* sv_ip, const char* port, const char* plid) {
 
     int fd, errcode; 
     struct addrinfo hints, *res;
@@ -169,11 +170,11 @@ int show_trials(const char* sv_ip, const char* port, const char* plid) {
     // start reading from the tcp connection
     // stop when the header was fully read to the response buffer
     while (true) {
-        memset(aux_buffer, 0, sizeof(aux_buffer));
+        //memset(aux_buffer, 0, sizeof(aux_buffer));
         ssize_t bytes_read = read(fd, aux_buffer, max_size);
-        printf("aux-buffer: %s\n", aux_buffer);
+        printf("aux-buffer: %s\t, bytes_read: %ld\n", aux_buffer, bytes_read);
         if(bytes_read < 0) {
-            std::cerr << "ERROR: failed while reading from TCP connection\n";
+            std::cerr << "ERROR: failed while reading from TCP connection, PRIMEIRO WHILE\n";
             freeaddrinfo(res);
             close(fd);
             return ERROR;
@@ -214,7 +215,7 @@ int show_trials(const char* sv_ip, const char* port, const char* plid) {
             memset(aux_buffer, 0, sizeof(aux_buffer));
             ssize_t bytes_read = read(fd, aux_buffer, max_size);
             if(bytes_read < 0) {
-                std::cerr << "ERROR: failed while reading from TCP connection\n";
+                std::cerr << "ERROR: failed while reading from TCP connection, SECOND WHILE\n";
                 freeaddrinfo(res);
                 close(fd);
                 return ERROR;
@@ -255,7 +256,7 @@ int show_trials(const char* sv_ip, const char* port, const char* plid) {
 
 
 
-int scoreboard(const char* sv_ip, const char* port) {
+int commandScoreboard(const char* sv_ip, const char* port) {
     int fd, errcode; 
     struct addrinfo hints, *res;
     char request_buffer[256], response_buffer[MAX_FILE_SIZE + HEADER_SIZE], aux_buffer[MAX_FILE_SIZE + HEADER_SIZE];
@@ -396,7 +397,7 @@ int scoreboard(const char* sv_ip, const char* port) {
     return 1;
 }
 
-int start_game(const char* sv_ip, const char* port, const char* plid, const char* max_playtime) {
+int commandStartGame(const char* sv_ip, const char* port, const char* plid, const char* max_playtime) {
 
     int fd, errcode, num_args;
     ssize_t n;
@@ -407,19 +408,19 @@ int start_game(const char* sv_ip, const char* port, const char* plid, const char
     char cmd[32], status[32];
 
     if(!validPLID(plid)) {
-        std::cerr << "Invalid PLID. Variable must be six digits long.\n";
-        return 0;
+        std::cerr << "ERROR: Invalid PLID. Variable must be six digits long.\n";
+        return ERROR;
     }
 
     if(!verifyMaxPlaytime(max_playtime)) {
-        std::cerr << "Invalid Max Playtime. Variable must be less than 600 seconds.\n";
-        return 0;
+        std::cerr << "ERROR: Invalid Max Playtime. Variable must be less than 600 seconds.\n";
+        return ERROR;
     }
     // Create UDP socket
     fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (fd == -1) {
-        std::cerr << "Error creating socket\n";
-        return 0;
+        std::cerr << "ERROR: Error creating socket\n";
+        return ERROR;
     }
 
     // Prepare the hints structure
@@ -430,73 +431,75 @@ int start_game(const char* sv_ip, const char* port, const char* plid, const char
     // Get address info
     errcode = getaddrinfo(sv_ip, port, &hints, &res);
     if (errcode != 0) {
-        std::cerr << "Error in getaddrinfo: " << gai_strerror(errcode) << "\n";
+        std::cerr << "ERROR: failed to getaddrinfo: " << gai_strerror(errcode) << "\n";
         close(fd);
-        return 0;
+        return ERROR;
     }
 
     memset(request_buffer, 0, sizeof(request_buffer));
-    // traduzir msg para enviar para o server
-    sprintf(request_buffer, "%s %s %s\n", "SNG", plid, max_playtime);
+    sprintf(request_buffer, "SNG %s %s\n", plid, max_playtime);
 
     // conectar com server
     n = sendto(fd, request_buffer, strlen(request_buffer), 0, res->ai_addr, res->ai_addrlen);
     if (n == -1) {
-        std::cerr << "Error sending data\n";
+        std::cerr << "ERRROR: failed to send data\n";
         freeaddrinfo(res);
         close(fd);
-        return 0;
+        return ERROR;
     }
     
     // Receive response
     addrlen = sizeof(addr);
-
     memset(response_buffer, 0, sizeof(response_buffer));
     n = recvfrom(fd, response_buffer, sizeof(response_buffer), 0, (struct sockaddr*)&addr, &addrlen);
     if (n == -1) {
-        std::cerr << "Error receiving data\n";
+        std::cerr << "ERROR: failed to receive data\n";
         freeaddrinfo(res);
         close(fd);
-        return 0;
+        return ERROR;
     }
 
     num_args = sscanf(response_buffer, "%s %s\n", cmd, status);
 
     if(strcmp(cmd, "RSG")) {
-        std::cerr << "Communication error.\n";
+        std::cerr << "ERROR: Communication error.\n";
         freeaddrinfo(res);
         close(fd);
-        return 1;
+        return ERROR;
     }
-    
+
+    int return_value;
     switch (num_args){
         case 2:
             if(!strcmp(status, "NOK")) {
                 std::cout << "Player " << plid << " already has an ongoing game.\n";
+                return_value = ERROR;
             }
             else if(!strcmp(status, "OK")) {
                 std::cout << "New game started (max " << max_playtime <<" sec).\n";
+                return_value = SUCCESS;
             }
             else if(!strcmp(status, "ERR")) {
                 std::cout << "Something is not right. Probably player PLID is invalid, time is over 600 seconds or the syntax of the \"SNG\" is incorrect\n.";
+                return_value = ERROR;
             }
             else {
-                std::cerr << "Communication error.\n";
+                std::cerr << "ERROR: Communication error.\n";
+                return_value = ERROR;
             }
             break;
         default:
-            std::cerr << "Communication error.\n";
+            std::cerr << "ERROR: Communication error.\n";
+            return_value = ERROR;
             break;
     }
 
-    // clean up
     freeaddrinfo(res);
     close(fd);
-
-    return 1;
+    return return_value;
 }
 
-int try_command(const char* sv_ip, const char* port, const char* c1, const char* c2, const char* c3, const char* c4, int* nT, const char* plid) {
+int commmandTry(const char* sv_ip, const char* port, const char* c1, const char* c2, const char* c3, const char* c4, int* nT, const char* plid) {
 
     int fd, errcode;
     ssize_t n;
@@ -507,23 +510,21 @@ int try_command(const char* sv_ip, const char* port, const char* c1, const char*
     char request_buffer[256], response_buffer[256];
     char cmd[32], status[32], arg1[32], arg2[32], arg3[32], arg4[32];
 
-
-    //talvez não seja preciso, pois já é testado no debug/start
     if(!validPLID(plid)) {
-        std::cerr << "Invalid PLID. Variable must be six digits long.\n";
-        return 0;
+        std::cerr << "ERROR: Invalid PLID. Variable must be six digits long.\n";
+        return ERROR;
     }
 
     if(!validColor(c1) || !validColor(c2) || !validColor(c3) || !validColor(c4)) {
-        std::cerr << "Incorrect color Code. Possible colors are:\nR -> Red\nG -> Green\nB -> Blue\nY -> Yellow\nO -> Orange\nP -> purple\n";
-        return 0;
+        std::cerr << "ERROR: Incorrect color Code. Possible colors are:\nR -> Red\nG -> Green\nB -> Blue\nY -> Yellow\nO -> Orange\nP -> purple\n";
+        return ERROR;
     }
     
     // Create UDP socket
     fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (fd == -1) {
-        std::cerr << "Error creating socket\n";
-        return 0;
+        std::cerr << "ERROR: failed to create socket\n";
+        return ERROR;
     }
 
     // Prepare the hints structure
@@ -534,22 +535,21 @@ int try_command(const char* sv_ip, const char* port, const char* c1, const char*
     // Get address info
     errcode = getaddrinfo(sv_ip, port, &hints, &res);
     if (errcode != 0) {
-        std::cerr << "Error in getaddrinfo: " << gai_strerror(errcode) << "\n";
+        std::cerr << "ERROR: failed to getaddrinfo: " << gai_strerror(errcode) << "\n";
         close(fd);
-        return 0;
+        return ERROR;
     }
 
     memset(request_buffer, 0, sizeof(request_buffer));
-    // traduzir msg para enviar para o server (plid precisam ser substituidos pelos valores corretos)
-    sprintf(request_buffer, "%s %s %s %s %s %s %d\n", "TRY", plid, c1, c2, c3, c4, *nT);
+    sprintf(request_buffer, "TRY %s %s %s %s %s %d\n", plid, c1, c2, c3, c4, *nT);
 
-    // connect with the server
+    // Connect with the server
     n = sendto(fd, request_buffer, strlen(request_buffer), 0, res->ai_addr, res->ai_addrlen);
     if (n == -1) {
-        std::cerr << "Error sending data\n";
+        std::cerr << "ERROR: failed to send data\n";
         freeaddrinfo(res);
         close(fd);
-        return 0;
+        return ERROR;
     }
 
     // Receive response
@@ -557,81 +557,90 @@ int try_command(const char* sv_ip, const char* port, const char* c1, const char*
     memset(response_buffer, 0, sizeof(response_buffer));
     n = recvfrom(fd, response_buffer, sizeof(response_buffer), 0, (struct sockaddr*)&addr, &addrlen);
     if (n == -1) {
-        std::cerr << "Error receiving data\n";
+        std::cerr << "ERROR: failed to receive data\n";
         freeaddrinfo(res);
         close(fd);
-        return 0;
+        return ERROR;
     }
-    //printf("RESPONSE BUFFER: %s", response_buffer);
     num_args = sscanf(response_buffer, "%s %s %s %s %s %s\n", cmd, status, arg1, arg2, arg3, arg4);
 
     if(strcmp(cmd, "RTR")) {
-        std::cerr << "Communication error.\n";
+        std::cerr << "ERROR: Communication error.\n";
         freeaddrinfo(res);
         close(fd);
-        return 0;
+        return ERROR;
     }
     
+    int return_value;
     switch (num_args){
         case 2:
             if(!strcmp(status, "DUP")) {
                 std::cout << "You already tried this color code. Number of trials not increased.\n";
+                return_value = ERROR;
             }
             else if(!strcmp(status, "INV")) {
                 std::cerr << "Wrong trial number.\n";
+                return_value = ERROR;
             }
             else if(!strcmp(status, "NOK")) {
                 std::cerr << "Something is not right, probably player " << plid << " does not have an ongoing game.\n";
+                return_value = ERROR;
             }
             else if(!strcmp(status, "ERR")) {
                 std::cerr << "Invalid syntax. Either PLID or color code is not allowed.\n";
+                return_value = ERROR;
             }
             else {
-                std::cerr << "Communication error.\n";
+                std::cerr << "ERROR: Communication error.\n";
+                return_value = ERROR;
             }
             break;
 
         case 5:
             if(!strcmp(status, "OK")) {
                 if (!strcmp(arg2, "4")) {
-                    std::cout << "Congratulations!! You correctly guessed the secret color code in " << arg1 << "trials\n";
-                    freeaddrinfo(res);
-                    close(fd);
-                    return GAME_WON;
+                    std::cout << "Congratulations!! You correctly guessed the secret color code in " << arg1 << " trials\n";
+                    return_value = GAME_WON;
                 }
                 else {
                     int trials_left = 8 - std::stoi(arg1);
-                    std::cout << "nB: " << arg2 << "\tnW: " << arg3 << "\ttrials left: " << trials_left << "\n"; // meter numero de trials
+                    std::cout << "nB: " << arg2 << "\tnW: " << arg3 << "\tTrials left: " << trials_left << "\n";
                     (*nT)++;
+                    return_value = SUCCESS;
+                     
                 }
             }
             else {
                 std::cerr << "Communication error.\n";
+                return_value = ERROR;
             }
             break;
         case 6:
             if(!strcmp(status, "ENT")) {
                 std::cout << "Limit of trials reached. The correct color code was:\n\t\t### " << arg1 << " " << arg2 << " " << arg3 << " " << arg4 << " ###\n";
+                return_value = GAME_END;
             }
             else if(!strcmp(status, "ETM")) {
                 std::cout << "Maximum play time exceeded. The correct color code was:\n\t\t### " << arg1 << " " << arg2 << " " << arg3 << " " << arg4 << " ###\n";
+                return_value = GAME_END;
             }
             else {
-                std::cerr << "Communication error.\n";
+                std::cerr << "ERROR: Communication error.\n";
+                return_value = ERROR;
             }
             break;
         default:
-            std::cerr << "Communication error.\n";
+            std::cerr << "ERROR: Communication error.\n";
+            return_value = ERROR;
             break;
     }
 
-    // clean up
     freeaddrinfo(res);
     close(fd);
-    return 1;
+    return return_value;
 }
 
-int debug_command(const char* sv_ip, const char* port, const char* plid, const char* max_playtime, const char* c1, const char* c2, const char* c3, const char* c4) {
+int commandDebug(const char* sv_ip, const char* port, const char* plid, const char* max_playtime, const char* c1, const char* c2, const char* c3, const char* c4) {
 
     int fd, errcode, num_args;
     ssize_t n;
@@ -642,23 +651,23 @@ int debug_command(const char* sv_ip, const char* port, const char* plid, const c
     char cmd[32], status[32];
 
     if(!validPLID(plid)) {
-        std::cerr << "Invalid PLID. Variable must be six digits long.\n";
-        return 0;
+        std::cerr << "ERROR: Invalid PLID. Variable must be six digits long.\n";
+        return ERROR;
     }
     if(!verifyMaxPlaytime(max_playtime)) {
-        std::cerr << "Invalid Max Playtime. Variable must be less than 600 seconds.\n";
-        return 0;
+        std::cerr << "ERROR: Invalid Max Playtime. Variable must be less than 600 seconds.\n";
+        return ERROR;
     }
     if(!validColor(c1) || !validColor(c2) || !validColor(c3) || !validColor(c4)) {
-        std::cerr << "Incorrect color Code. Possible colors are:\nR -> Red\nG -> Green\nB -> Blue\nY -> Yellow\nO -> Orange\nP -> purple\n";
-        return 0;
+        std::cerr << "ERROR: Incorrect color Code. Possible colors are:\nR -> Red\nG -> Green\nB -> Blue\nY -> Yellow\nO -> Orange\nP -> purple\n";
+        return ERROR;
     }
 
     // Create UDP socket
     fd = socket(AF_INET, SOCK_DGRAM, 0);
     if (fd == -1) {
-        std::cerr << "Error creating socket\n";
-        return 1;
+        std::cerr << "ERROR: failed to create socket\n";
+        return ERROR;
     }
 
     // Prepare the hints structure
@@ -669,21 +678,20 @@ int debug_command(const char* sv_ip, const char* port, const char* plid, const c
     // Get address info
     errcode = getaddrinfo(sv_ip, port, &hints, &res);
     if (errcode != 0) {
-        std::cerr << "Error in getaddrinfo: " << gai_strerror(errcode) << "\n";
+        std::cerr << "ERROR: failed to getaddrinfo: " << gai_strerror(errcode) << "\n";
         close(fd);
-        return 1;
+        return ERROR;
     }
 
     memset(request_buffer, 0, sizeof(request_buffer));
-    sprintf(request_buffer, "%s %s %s %s %s %s %s\n", "DBG", plid, max_playtime, c1, c2, c3, c4);
+    sprintf(request_buffer, "DBG %s %s %s %s %s %s\n", plid, max_playtime, c1, c2, c3, c4);
 
-    // conectar com server
     n = sendto(fd, request_buffer, strlen(request_buffer), 0, res->ai_addr, res->ai_addrlen);
     if (n == -1) {
-        std::cerr << "Error sending data\n";
+        std::cerr << "ERROR: failed to send data\n";
         freeaddrinfo(res);
         close(fd);
-        return 1;
+        return ERROR;
     }
 
 
@@ -692,19 +700,19 @@ int debug_command(const char* sv_ip, const char* port, const char* plid, const c
     memset(response_buffer, 0, sizeof(response_buffer));
     n = recvfrom(fd, response_buffer, sizeof(response_buffer), 0, (struct sockaddr*)&addr, &addrlen);
     if (n == -1) {
-        std::cerr << "Error receiving data\n";
+        std::cerr << "ERROR: failed to receive data\n";
         freeaddrinfo(res);
         close(fd);
-        return 1;
+        return ERROR;
     }
 
     num_args = sscanf(response_buffer, "%s %s\n", cmd, status);
 
     if(strcmp(cmd, "RDB")) {
-        std::cerr << "Communication error.\n";
+        std::cerr << "ERROR: Communication error.\n";
         freeaddrinfo(res);
         close(fd);
-        return 1;
+        return ERROR;
     }
     
     switch (num_args){
