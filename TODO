@@ -8,14 +8,12 @@
 
 
 
-
-- o que mandar quando o start da um erro do lado do server por exemplo?
-- diretoria pode ser assim?:
-    "sprintf(file_name, "./server/GAMES/GAME_%s.txt", plid);"
-    funciona com todos os players que testem??
+<!-- - diretoria pode ser assim?: --> - sim
+<!--     funciona com todos os players que testem?? -->
 - verificações de erro na mensagem são antes ou depois de testar se um jogo está a decorrer?
+
 - shutdown nos ficheiros ou close chega?
-- tem mal abrir e fechar várias vezes os ficheiros? (para verificar se ha gameON)
-- quando do lado do server der um erro não esperado (ex: um ficheiro não abrir), o que é suposto mandar para o player
-- O VERBOSE pode ser uma variável global?
-- como funciona dois starts seguidos, e se der timeout, reescreve-se por cima? guarda-se o ficheiro mesmo sem trys?
+<!-- - tem mal abrir e fechar várias vezes os ficheiros? (para verificar se ha gameON) --> sim, é ok
+<!-- - quando do lado do server der um erro não esperado (ex: um ficheiro não abrir), o que é suposto mandar para o player --> - timeout
+<!-- - O VERBOSE pode ser uma variável global? --> - sim
+<!-- - como funciona dois starts seguidos, e se der timeout, reescreve-se por cima? guarda-se o ficheiro mesmo sem trys? --> - não nos preocuparmos muito com isto, mas reescreve-se por cima, no quit ele não respondeu

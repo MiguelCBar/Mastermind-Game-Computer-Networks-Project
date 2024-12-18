@@ -31,13 +31,13 @@ bool verifyMaxPlaytime(const std::string& input) {
 }
 
 
-bool containsChar(const char* buffer, size_t size, char target) {
+size_t containsChar(const char* buffer, size_t size, char target) {
     for (size_t i = 0; i < size; ++i) {
         if (buffer[i] == target) {
-            return true;
+            return (i + 1);
         }
     }
-    return false;
+    return 0;
 }
 /* 
 bool parseFileHeader(const std::string& response_buffer, ssize_t* file_size, char* cmd, char* status, char* file_name, ssize_t* headersize) {
@@ -97,6 +97,7 @@ int timeExceeded(const char* plid) {
 
     time_t current_time = time(NULL);
     game_duration = (int)difftime(current_time, start_time); // VERIFICAR SE É PRECISO PASSAR O START TIME PARA TIME PORQUE FOI LIDO COM %ld
+    fclose(file);
 
     return max_game_time < game_duration;
 }

@@ -116,27 +116,12 @@ int end_game(const char* sv_ip, const char* port, const char* plid) {
 
 int show_trials(const char* sv_ip, const char* port, const char* plid) {
 
-    /*std::cout << "Comando: show_trials\n";
-    std::cout << "sv_ip: " << sv_ip << "\n";
-    std::cout << "port: " << port << "\n"; */
-
-    int fd, errcode;
-    ssize_t n, total_bytes = 0, bytes_remaining;
-    //socklen_t addrlen;
+    int fd, errcode; 
     struct addrinfo hints, *res;
-    //struct sockaddr_in addr;
     char request_buffer[256], response_buffer[MAX_FILE_SIZE + HEADER_SIZE], aux_buffer[MAX_FILE_SIZE + HEADER_SIZE];
-
+    char cmd[32], status[32], file_name[128];
     FILE *st_file;
-    ssize_t file_size;
-    char status[32], file_name[128];
-
-    // Create the socket
-    fd = socket(AF_INET, SOCK_STREAM, 0); // TCP socket
-    if (fd == -1) {
-        std::cerr << "socket\n";
-        return 0;
-    }
+    ssize_t n, total_bytes = 0, file_size;
 
     // Set up the hints for getaddrinfo
     memset(&hints, 0, sizeof(hints));
@@ -146,153 +131,105 @@ int show_trials(const char* sv_ip, const char* port, const char* plid) {
     // Get address info
     errcode = getaddrinfo(sv_ip, port, &hints, &res);
     if (errcode != 0) {
-        std::cerr << "getaddrinfo: "<< gai_strerror(errcode) << "\n";
-        return 0;
+        std::cerr << "ERROR: getaddrinfo: "<< gai_strerror(errcode) << "\n";
+        return ERROR;
     }
-
+    // Create the socket
+    fd = socket(AF_INET, SOCK_STREAM, res->ai_protocol); // TCP socket
+    if (fd == ERROR) {
+        std::cerr << "ERROR: socket\n";
+        return ERROR;
+    }
     // Connect to the server
     n = connect(fd, res->ai_addr, res->ai_addrlen);
-    if (n == -1) {
-        std::cerr << "connect\n";
+    if (n == ERROR) {
+        std::cerr << "ERROR: connect\n";
         freeaddrinfo(res);
-        return 0;
+        return ERROR;
     }
-
-
+    // request show_trials to the server
     memset(request_buffer, 0, sizeof(request_buffer));
     sprintf(request_buffer, "STR %s\n", plid);
     
     ssize_t buffer_length = sizeof(request_buffer);
-
     while(total_bytes < buffer_length) {
         ssize_t bytes_sent = write(fd, request_buffer + total_bytes, buffer_length - total_bytes);
         if(bytes_sent < 0) {
             std::cerr << "Error while writing to TCP connection\n";
             freeaddrinfo(res);
             close(fd);
-            return 0;
+            return ERROR;
         }
         total_bytes += bytes_sent;
     }
 
     memset(response_buffer, 0, sizeof(response_buffer));
     total_bytes = 0;
-    ssize_t header_size = HEADER_SIZE;
+    size_t header_size;
     ssize_t max_size = MAX_FILE_SIZE + HEADER_SIZE;
 
-    /* while(total_bytes < max_size - 1) {
-   
-        //ssize_t bytes_remaining = max_size - total_bytes;
-
+    // 
+    while (true) {
         memset(aux_buffer, 0, sizeof(aux_buffer));
-        ssize_t bytes_read = read(fd, aux_buffer, sizeof(aux_buffer));
-        printf("bytes read: %ld\taux buffer: %s\n", bytes_read, aux_buffer);
-
-        if (bytes_read == 0) {
-            std::cout << "Conection terminated by peer.\n";
-            break;
-        }
-
-        else if(bytes_read < 0) {
-            if (errno == ECONNRESET) {
-                break;
-            }
-            std::cerr << "Error while reading from TCP connection\n";
-            freeaddrinfo(res);
-            close(fd);
-            return 0;
-        }
-        aux_buffer[bytes_read] = '\0';
-        strcpy(response_buffer + total_bytes, aux_buffer);
-        total_bytes += bytes_read;
-    }
-    response_buffer[total_bytes] = '\0';
-    //printf("response buffer: %s\n\n", response_buffer);
-    return 0; */
-
-    memset(response_buffer, 0, sizeof(response_buffer));
-    while (max_size > 0) {
-        ssize_t bytes_read = read(fd, response_buffer + total_bytes, sizeof(response_buffer) - total_bytes);
+        ssize_t bytes_read = read(fd, aux_buffer, max_size);
         if(bytes_read < 0) {
             std::cerr << "Error while reading from TCP connection\n";
             freeaddrinfo(res);
             close(fd);
-            return 0;
+            return ERROR;
         }
         if(bytes_read == 0) {
-            printf("saiu bem!\n");
             break;
         }
-        for(int i = 0; i < 300; i++) {
-            printf("b[%d]:%d", i, response_buffer[i]);
-        }
+        strncat(response_buffer, aux_buffer, bytes_read);
         total_bytes += bytes_read;
-    }
-    printf("saiu do while: %s\n", response_buffer);
-
-
-    /* while (true) {
-        memset(aux_buffer, 0, sizeof(aux_buffer));
-        ssize_t bytes_read = read(fd, aux_buffer, sizeof(aux_buffer) - total_bytes);
-        printf("aux buffer: %s\n", aux_buffer);
-        if(bytes_read < 0) {
-            std::cerr << "Error while reading from TCP connection\n";
-            freeaddrinfo(res);
-            close(fd);
-            return 0;
-        }
-        aux_buffer[bytes_read] = '\0';
-        strcpy(response_buffer + total_bytes, aux_buffer);
-        total_bytes += bytes_read;
+        max_size -= bytes_read;
         printf("response_buffer fora do parser do header: %s\n", response_buffer);
 
-        if(containsChar(response_buffer, strlen(response_buffer), '\n')) {
+        if(header_size = containsChar(response_buffer, strlen(response_buffer), '\n')) {
             sscanf(response_buffer, "%s %s %s %ld\n", cmd, status, file_name, &file_size);
             break;
         }
     }
-    printf("cmd: %s\nstatus: %s\nfile name:%s\nfile size:%ld\n", cmd, status, file_name, file_size);
-    return 0; */
-    if(file_size > MAX_FILE_SIZE) {
-        std::cerr << "Fsize cannot be bigger than 2KiB (2x1024B)\n";
-        return 0;
-    }
     if(strlen(file_name) > 24) {
         std::cerr << "Fname cannot be bigger than 24B\n";
-        return 0;
+        return ERROR;
     }
+    if(file_size > MAX_FILE_SIZE) {
+        std::cerr << "Fsize cannot be bigger than 2KiB (2x1024B)\n";
+        return ERROR;
+    }
+    
     if(!strcmp(status, "ACT") || !strcmp(status, "FIN")) {
 
         st_file = fopen(file_name, "w+");
-        bytes_remaining = total_bytes - header_size;
-        fseek(st_file, 0, SEEK_END);
-        fwrite(response_buffer, 1, bytes_remaining, st_file);
-
-        while(bytes_remaining < file_size) {
+        total_bytes -= header_size;
+        fwrite(response_buffer + header_size, 1, total_bytes, st_file);
+        while(total_bytes < file_size) {
             memset(aux_buffer, 0, sizeof(aux_buffer));
-            ssize_t bytes_read = read(fd, aux_buffer, sizeof(aux_buffer) - total_bytes);
+            ssize_t bytes_read = read(fd, aux_buffer, max_size);
             if(bytes_read < 0) {
                 std::cerr << "Error while reading from TCP connection\n";
                 freeaddrinfo(res);
                 close(fd);
-                fclose(st_file);
-                return 0;
+                return ERROR;
             }
-            aux_buffer[bytes_read] = '\0';
-            strcpy(response_buffer + total_bytes, aux_buffer);
+            if(bytes_read == 0) {
+                break;
+            }
+            strncat(response_buffer, aux_buffer, bytes_read);
             total_bytes += bytes_read;
+            max_size -= bytes_read;
             fwrite(aux_buffer, 1, bytes_read, st_file);
         }
-
         std::cout << "Fname: " << file_name << "\n";
         std::cout << "Fsize: " << file_size << "\n";
-
         char line[256];
         fseek(st_file, 0, SEEK_SET);
-        while (fgets(line, sizeof(line), st_file)) {
+        while (fgets(line, sizeof(line), st_file))
             std::cout << line;
-        }
     }
+
     else if(!strcmp(status, "NOK")) {
         std::cout << "Something went wrong, probably player has no game history\n";
         return 0;
@@ -300,20 +237,16 @@ int show_trials(const char* sv_ip, const char* port, const char* plid) {
     else {
         std::cerr << "Communication error.\n";
     }
-
-
-
-
-
     freeaddrinfo(res);
     fclose(st_file);
     close(fd);
-
     return 1;
 }
 
+
+
 int scoreboard(const char* sv_ip, const char* port) {
-    int fd, errcode;
+/*     int fd, errcode;
     ssize_t n, total_bytes = 0, bytes_remaining;
     //socklen_t addrlen;
     struct addrinfo hints, *res;
@@ -435,7 +368,7 @@ int scoreboard(const char* sv_ip, const char* port) {
 
     freeaddrinfo(res);
     fclose(st_file);
-    close(fd);
+    close(fd); */
 
     return 1;
 }
