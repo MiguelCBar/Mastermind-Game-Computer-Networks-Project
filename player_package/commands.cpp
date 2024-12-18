@@ -499,7 +499,7 @@ int commandStartGame(const char* sv_ip, const char* port, const char* plid, cons
     return return_value;
 }
 
-int commmandTry(const char* sv_ip, const char* port, const char* c1, const char* c2, const char* c3, const char* c4, int* nT, const char* plid) {
+int commandTry(const char* sv_ip, const char* port, const char* c1, const char* c2, const char* c3, const char* c4, int* nT, const char* plid) {
 
     int fd, errcode;
     ssize_t n;
@@ -714,33 +714,36 @@ int commandDebug(const char* sv_ip, const char* port, const char* plid, const ch
         close(fd);
         return ERROR;
     }
-    
+
+    int return_value;
     switch (num_args){
         case 2:
             if(!strcmp(status, "NOK")) {
                 std::cout << "Player " << plid << " already has an ongoing game.\n";
+                return_value = ERROR;
             }
             else if(!strcmp(status, "OK")) {
                 std::cout << "New game started in debug mode (max " << max_playtime <<"sec).\n";
+                return_value = SUCCESS;
             }
             else if(!!strcmp(status, "ERR")) {
                 std::cout << "Something is not right. Check the validity of the following arguments:\n" <<
                             "-> Syntax of \"DBG\" message\n" <<
                             "-> PLID\n-> Color code\n" <<
                             "-> Max play time (cannot be over 600 seconds)\n";
+                return_value = ERROR;
             }
             else {
-                std::cerr << "Communication error.\n";
+                std::cerr << "ERROR: Communication error.\n";
+                return_value = ERROR;
             }
             break;
         default:
-            std::cerr << "Communication error.\n";
+            std::cerr << "ERROR: Communication error.\n";
+            return_value = ERROR;
             break;
     }
-
-    // clean up
     freeaddrinfo(res);
     close(fd);
-
-    return 1;
+    return return_value;
 }

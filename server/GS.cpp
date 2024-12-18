@@ -195,7 +195,53 @@ int startGame(const char* plid, const char* max_playtime, const char* mode, cons
 }
 
 
-int testTrial(const char* plid, const char* c1, const char* c2, const char* c3, const char* c4, const char* new_trial_number, char* response_buffer) {
+int makeNewTrial (char* response_buffer, const char* file_name, const char* plid, const char* guess, int trial_number, int* nB, int* nW) {
+
+    char guess[5];
+    int verified_colors[4] = {false, false, false, false};
+    int game_state;
+    char color_code[5] = "RRRR";
+
+    for (int i = 0; i < 4; i++) {
+        if (guess[i] == color_code[i]) {
+            verified_colors[i] = true;
+            (*nB)++;
+        }
+    }
+    for (int i = 0; i < 4; i++) {
+        if (!verified_colors[i]) {
+            for(int j = 0; j < 4; j++) {
+                if (i != j && !verified_colors[j] && guess[i] == color_code[j]) {
+                    (*nW)++;
+                    verified_colors[j] = true;
+                    break;
+                }
+            }
+        }
+    }
+    if ((*nB) == 4) {
+        game_state = GAME_WON;
+    }
+    else if (trial_number == 8){    // no more tries available
+        game_state = GAME_END;
+    }
+
+    char trial_line[128];
+    memset(trial_line, 0, sizeof(trial_line));
+    int time_passed = getTimePassed(plid);
+    sprintf(trial_line, "T: ", guess, nB, nW, time_passed);         // create trial line
+
+    // Append new try to the game file
+    FILE* file = fopen(file_name, "a");
+    if (!file) {
+        return ERROR;       // ERROR a abrir ficheiro
+    }
+    fprintf(file, "%s\n", trial_line);
+    fclose(file);
+}
+
+
+int handleTryCommand(const char* plid, const char* c1, const char* c2, const char* c3, const char* c4, const char* new_trial_number, char* response_buffer) {
 
     if(!validPLID(plid) || !validColor(c1) || !validColor(c2) || !validColor(c3) || !validColor(c4)){
         sprintf(response_buffer, "RTR ERR\n");
@@ -210,7 +256,6 @@ int testTrial(const char* plid, const char* c1, const char* c2, const char* c3, 
         sprintf(response_buffer, "RTR ETM\n");
         return 0;
     }
-
     char old_guess[5], new_guess[5], file_name[64];
     char line[256]; // Buffer para armazenar cada linha lida do ficheiro
     int trials = 0;
@@ -245,50 +290,19 @@ int testTrial(const char* plid, const char* c1, const char* c2, const char* c3, 
         return ERROR;
     }
 
-
-    // valid trial, test it
-    char color_code[5] = "RRRR";
-    char guess[5];
-    int verified_colors[4] = {false, false, false, false};
     int nB = 0, nW = 0;
+    int game_state = makeNewTrial(response_buffer, file_name, plid, new_guess, trials + 1, &nB, &nW);
 
-    sprintf(guess, "%s%s%s%s", c1, c2, c3, c4);
-
-    for (int i = 0; i < 4; i++) {
-        if (guess[i] == color_code[i]) {
-            verified_colors[i] = true;
-            nB++;
-        }
-    }
-    for (int i = 0; i < 4; i++) {
-        if (!verified_colors[i]) {
-            for(int j = 0; j < 4; j++) {
-                if (i != j && !verified_colors[j] && guess[i] == color_code[j]) {
-                    nW++;
-                    verified_colors[j] = true;
-                    break;
-                }
-            }
-        }
-    }
-    if (nB == 4) {
+    if (game_state = GAME_WON) {
         endGame(plid, 'W');
     }
-    else if (trials == 7){
+    else if (game_state = GAME_END){    // no more tries available
         endGame(plid, 'F');
+        sprintf(response_buffer, "RTR ENT %s %s %s %s\n", c1, c2, c3, c4);  // create response to player
+
     }
-    sprintf(response_buffer + 4, "OK %s %s %s\n", new_trial_number, nB, nW);    // create response to player
+    sprintf(response_buffer, "RTR OK %d %d %d\n", new_trial_number, nB, nW);  // create response to player
 
-    char trial_line[128];
-    memset(trial_line, 0, sizeof(trial_line));
-    int time_passed = getTimePassed(plid);
-    sprintf(trial_line, "T: %s%s%s%s", c1, c2, c3, c4, nB, nW, time_passed);    // create trial line
-
-    // Append new try to the game file
-    FILE* file = fopen(file_name, "a");
-    if (!file) {return ERROR;}      // ERROR a abrir ficheiro
-    fprintf(file, "%s\n", trial_line);
-    fclose(file);
     return 1;
 }
 
@@ -332,7 +346,7 @@ int resolveUDPCommands(const char* input, char* response_buffer) {
                 }
             }
             else if (!strcmp(cmd, "TRY")) {
-                if(!testTrial(arg1, arg2, arg3, arg4, arg5, arg6, response_buffer)){
+                if(!handleTryCommand(arg1, arg2, arg3, arg4, arg5, arg6, response_buffer)){
                     return 0; // nao vai haver returns em principio, só se houver erros que seja suposto mandar o programa abaixo
                 }
             }

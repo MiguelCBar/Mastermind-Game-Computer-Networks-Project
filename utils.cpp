@@ -103,7 +103,6 @@ int getTimePassed(const char* plid) {
     if (max_game_time < game_duration) {
         game_duration = max_game_time;
     }
-
     return game_duration;
 }
 

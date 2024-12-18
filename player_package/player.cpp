@@ -71,20 +71,20 @@ int main(int argc, char* argv[]) {
                     if(active_game) {
                         commandEndGame(sv_ip, port, plid);
                     }
-                    return 0; //sair do programa
+                    return 0;
                 }
                 else if (!strcmp(cmd, "st") || !strcmp(cmd, "show_trials")) {
-                    if (active_game) {
+                    if (plid != NULL) {
                         commandShowTrials(sv_ip, port, plid);
                     } else {
                         std::cout << "You do not have an ongoing game\n";
                     }
                 }
                 else if (!strcmp(cmd, "sb") || !strcmp(cmd, "scoreboard")) {
-                    commandScoreBoard(sv_ip, port);
+                    commandScoreboard(sv_ip, port);
                 }
                 else {
-                    std::cout << "Invalid command. Check cmd or number of arguments\n";
+                    std::cout << "ERROR: Invalid command. Check cmd or number of arguments\n";
                 }
                 break;
 
@@ -97,7 +97,7 @@ int main(int argc, char* argv[]) {
                     }
                 }
                 else {
-                    std::cout << "Invalid command. Check cmd or number of arguments\n";
+                    std::cout << "ERROR: Invalid command. Check cmd or number of arguments\n";
                 }
                 break;
 
@@ -108,18 +108,13 @@ int main(int argc, char* argv[]) {
                         if (try_status == GAME_WON || try_status == GAME_END) {          
                             active_game = false;
                         }
-                        else if(try_status == ERROR){
-                            // MIKE DO SOMETHING
-                            //
-                            //
-                            //
-                        }
+
                     } else {
                         std::cout << "You do not have an ongoing game\n";
                     }
                 }
                 else {
-                    std::cout << "Invalid command. Check cmd or number of arguments\n";
+                    std::cout << "ERROR: Invalid command. Check cmd or number of arguments\n";
                 }
                 break;
 
@@ -132,12 +127,12 @@ int main(int argc, char* argv[]) {
                     }
                 }   
                 else {
-                    std::cout << "Invalid command. Check cmd or number of arguments\n";
+                    std::cout << "ERROR: Invalid command. Check cmd or number of arguments\n";
                 } 
                 break;
 
             default:
-                std::cout << "Invalid command. Check cmd or number of arguments\n";
+                std::cout << "ERROR: Invalid command. Check cmd or number of arguments\n";
         }
     }
     return 0;
