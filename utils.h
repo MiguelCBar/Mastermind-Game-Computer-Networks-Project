@@ -4,13 +4,14 @@
 #include <string>
 
 bool validPLID(const std::string& input);
-size_t containsChar(const char* buffer, size_t size, char target);
 bool verifyMaxPlaytime(const std::string& input);
 bool validColor(const std::string& color);
 void generateColorCode(char* color_code);
-bool gameOn(const char* plid);
-int getTimePassed(const char* plid);
-int timeExceeded(const char* plid);
+int getTimePassed(const char* header);
+int timeExceeded(const char* header);
 int transcriptShowTrialsFile(const char* file_path, char* response_buffer);
+int getOngoingGameHeader(const char* plid, char* header);
+void getKeyColorCode(const char* header, char* color_code);
+void displayColorCode(const char* color_code, char* spaced_color_code);
 
 #endif

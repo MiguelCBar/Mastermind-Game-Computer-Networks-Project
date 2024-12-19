@@ -18,6 +18,7 @@ const int GAME_END = 3;
 const int GAME_ON = 4;
 
 // SIZES
+const int COLOR_CODE_SIZE = 4 + 1;
 const int COLOR_NUMBER = 6;
 const int PLID_SIZE = 6;
 const int HEADER_SIZE = 64;

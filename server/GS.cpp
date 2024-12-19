@@ -21,9 +21,9 @@ int mode = NOT_VERBOSE;
 
 //provavelmente, falta mais close(tcp_socket) e close(udp_socket), nos erros
 
-int endGame(const char* plid, const char finisher_mode, char* color_code) {
+int endGame(const char* plid, const char finisher_mode) {
 
-    char player_directory[128], file_name[256], time_str[16], file_line[256];
+    char player_directory[128], file_name[256], time_str[16], file_line[128];
     time_t fulltime;                                         
 
     // get file name
@@ -104,22 +104,28 @@ int endGame(const char* plid, const char finisher_mode, char* color_code) {
 
 int handlerQuitCommand(const char* plid, char* response_buffer) {
 
+    char header[HEADER_SIZE];
+    char color_code[COLOR_CODE_SIZE];
+
     if(!validPLID(plid)) {
         sprintf(response_buffer, "RQT ERR\n");
         return ERROR;
     }
-    if(!gameOn(plid)) {
+    memset(header, 0, sizeof(header));
+    if(getOngoingGameHeader(plid, header) == ERROR) {
         sprintf(response_buffer, "RQT NOK\n");      // not in a game, cant quit
         return 0;
     }
-    if(timeExceeded(plid)) {
+    if(timeExceeded(header)) {
         endGame(plid, TIMEOUT);
         sprintf(response_buffer, "RQT NOK\n");      // not in a game, already timed out
         return 0;
     }
-    char color_code[5] = endGame(plid, QUIT);
-    sprintf(response_buffer, "RQT OK\n");           // game on, quit game
-    return 1;
+    memset(color_code, 0, COLOR_CODE_SIZE);
+    getKeyColorCode(header, color_code);
+    endGame(plid, QUIT);
+    sprintf(response_buffer, "RQT OK %s\n", color_code);           // game on, quit game
+    return SUCCESS;
 }
 
 
@@ -131,10 +137,11 @@ int handlerStartCommand(const char* plid, const char* max_playtime, const char* 
     char file_line[128], file_name[64], time_str[20];
     char color_code[5]; // 4 chars + null terminator
     
-    //memset(response_buffer, 0, sizeof(response_buffer));
-    if(!strcmp(mode, "P")) {sprintf(response_buffer, "RSG ");}   // normal game mode
-    else {sprintf(response_buffer, "RDB ");}                     // debug game mode
-
+    if(!strcmp(mode, "P")) {
+        sprintf(response_buffer, "RSG ");      // normal game mode
+    } else {
+        sprintf(response_buffer, "RDB ");      // debug game mode
+    }                     
     if(!validPLID(plid) || !verifyMaxPlaytime(max_playtime)) {
         sprintf(response_buffer + 4, "ERR\n");
         return ERROR;
@@ -164,6 +171,7 @@ int handlerStartCommand(const char* plid, const char* max_playtime, const char* 
             }
         }
     }
+
     memset(color_code, 0, sizeof(color_code));      // clear color_code
     if (!strcmp(mode, "P")) {                       // normal game
         generateColorCode(color_code);              // generates the color code
@@ -189,7 +197,7 @@ int handlerStartCommand(const char* plid, const char* max_playtime, const char* 
     char first_file_line[128];
     memset(first_file_line, 0, sizeof(first_file_line));
     sprintf(first_file_line, "%s %s %s %s %s %ld", plid, mode, color_code, max_playtime, time_str, initialTime);
-    fprintf(file, "%s\n", first_file_line);
+    fprintf(file, "%s\n", first_file_line); // write first line to the file
 
     sprintf(response_buffer + 4, "OK\n");
     fclose(file);
@@ -249,30 +257,34 @@ int handlerTryCommand(const char* plid, const char* c1, const char* c2, const ch
         sprintf(response_buffer, "RTR ERR\n");
         return ERROR;
     }
-    if (!gameOn(plid)) {    // does not have a game going
-        sprintf(response_buffer, "RTR NOK\n");
-        std::cerr << "ERROR: Not a game Going\n";
+
+    char header[HEADER_SIZE];
+    memset(header, 0, sizeof(header));
+    if(getOngoingGameHeader(plid, header) == ERROR) {
+        sprintf(response_buffer, "RTR NOK\n");      // not in a game
         return 0;
     }
-    char color_code[5], old_guess[5], new_guess[5], file_name[64];
-    char line[256]; // Buffer para armazenar cada linha lida do ficheiro
+
+    char color_code[5], spaced_color_code[5];
+    memset(color_code, 0, COLOR_CODE_SIZE);
+    getKeyColorCode(header, color_code);
+    memset(spaced_color_code, 0, sizeof(spaced_color_code));
+    displayColorCode(color_code, spaced_color_code);
+
+    if (timeExceeded(header)) {
+        endGame(plid, TIMEOUT); // TESTAR ERROS
+        sprintf(response_buffer, "RTR ETM %s\n", spaced_color_code);
+        return 0;
+    }
+    char old_guess[5], new_guess[5], file_name[64];
+    char line[256]; // Buffer to store file line
     int trials = 0;
     bool duplicated = false;
 
     memset(file_name, 0, sizeof(file_name));
     sprintf(file_name, "GAMES/GAME_%s.txt", plid);
+
     FILE* file = fopen(file_name, "r");             // Opens the file in read mode
-    fgets(line, sizeof(line), file);                // gets header of the game
-    sscanf(line + 9, "%s", color_code);             // gets the right color code
-    fclose(file);
-
-    if (timeExceeded(plid)) {
-        endGame(plid, TIMEOUT); // TESTAR ERROS
-        sprintf(response_buffer, "RTR ETM %s\n", color_code);
-        return 0;
-    }
-
-    file = fopen(file_name, "r");                   // Opens the file in read mode
     sprintf(new_guess, "%s%s%s%s", c1, c2, c3, c4); // creates the new guess
     fgets(line, sizeof(line), file);                // ignores the first line
     while (fgets(line, sizeof(line), file)) {       // while there's more lines in the file
@@ -282,7 +294,7 @@ int handlerTryCommand(const char* plid, const char* c1, const char* c2, const ch
             duplicated = true;
         }
     }
-    fclose(file); // closes file
+    fclose(file);   // closes file
     
     if(std::atoi(new_trial_number) == trials && !strcmp(old_guess, new_guess)) { 
         sprintf(response_buffer, "RTR OK\n");   // resend, try already in file
@@ -290,11 +302,11 @@ int handlerTryCommand(const char* plid, const char* c1, const char* c2, const ch
     }
     else if (std::atoi(new_trial_number) != trials + 1) {                           
         sprintf(response_buffer, "RTR INV\n");  // invalid trial number
-        return ERROR;
+        return 0;
     }
     else if (duplicated) {                                                                   
         sprintf(response_buffer, "RTR DUP\n");  // duplicated guess
-        return ERROR;
+        return 0;
     }
 
     int nB = 0, nW = 0;
@@ -306,7 +318,7 @@ int handlerTryCommand(const char* plid, const char* c1, const char* c2, const ch
     }
     else if (game_state == GAME_END){    // game failure -> no more tries available
         endGame(plid, 'F');
-        sprintf(response_buffer, "RTR ENT %s\n", color_code);  // create ENT response to player
+        sprintf(response_buffer, "RTR ENT %s\n", spaced_color_code);  // create ENT response to player
     }
     return 1;
 }
