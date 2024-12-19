@@ -20,12 +20,12 @@
 
 int endGame(const char* plid, const char finisher_mode) {
 
-    char player_directory[256], file_name[256], time_str[16], file_line[256];
+    char player_directory[128], file_name[256], time_str[16], file_line[256];
     time_t fulltime;                                         
 
     // get file name
     memset(file_name, 0, sizeof(file_name));
-    sprintf(file_name, "./server/GAMES/GAME_%s.txt", plid);
+    sprintf(file_name, "./server/files/GAMES/GAME_%s.txt", plid);
 
     /*ADD LAST LINE TO THE PLAYER FILE*/
     memset(file_line, 0, sizeof(file_line));
@@ -54,7 +54,7 @@ int endGame(const char* plid, const char finisher_mode) {
     time(&fulltime);                // Current time in seconds since 1970
     struct tm* current_time = gmtime(&fulltime);
 
-    long initialTime = fulltime;    // Time in seconds since 1970
+    //long initialTime = fulltime;    // Time in seconds since 1970
     memset(file_line, 0, sizeof(file_line));
     sprintf(file_line, "%04d-%02d-%02d %02d:%02d:%02d %d\n",
              current_time->tm_year + 1900, current_time->tm_mon + 1, current_time->tm_mday,
@@ -70,7 +70,7 @@ int endGame(const char* plid, const char finisher_mode) {
 
     //define player directory path
     memset(player_directory, 0, sizeof(player_directory));
-    sprintf(player_directory, "server/GAMES/%s", plid);
+    sprintf(player_directory, "server/files/GAMES/%s", plid);
 
     if(!fs::exists(player_directory)) {
         if(!fs::create_directory(player_directory)) {
@@ -101,9 +101,6 @@ int endGame(const char* plid, const char finisher_mode) {
 
 int handlerQuitCommand(const char* plid, char* response_buffer) {
 
-    FILE* file;
-    char file_name[64];
-
     if(!validPLID(plid)) {
         sprintf(response_buffer, "RQT ERR\n");
         return ERROR;
@@ -128,7 +125,7 @@ int startGame(const char* plid, const char* max_playtime, const char* mode, cons
 
     time_t fulltime;                                         
     struct tm* currentTime;
-    char file_line[128], file_name[64], time_str[20], buffer[128];
+    char file_line[128], file_name[64], time_str[20];
     char color_code[5]; // 4 chars + null terminator
     
     memset(response_buffer, 0, sizeof(response_buffer));
@@ -145,7 +142,7 @@ int startGame(const char* plid, const char* max_playtime, const char* mode, cons
     }
     // define file name
     memset(file_name, 0, sizeof(file_name));
-    sprintf(file_name, "./server/GAMES/GAME_%s.txt", plid);
+    sprintf(file_name, "./server/files/GAMES/GAME_%s.txt", plid);
 
     FILE* file = fopen(file_name, "r");     // open file in read mode
     if(file) {
@@ -241,7 +238,7 @@ int makeNewTrial (char* response_buffer, const char* file_name, const char* plid
 }
 
 
-int handleTryCommand(const char* plid, const char* c1, const char* c2, const char* c3, const char* c4, const char* new_trial_number, char* response_buffer) {
+int handlerTryCommand(const char* plid, const char* c1, const char* c2, const char* c3, const char* c4, const char* new_trial_number, char* response_buffer) {
 
     if(!validPLID(plid) || !validColor(c1) || !validColor(c2) || !validColor(c3) || !validColor(c4)){
         sprintf(response_buffer, "RTR ERR\n");
@@ -264,7 +261,7 @@ int handleTryCommand(const char* plid, const char* c1, const char* c2, const cha
     sprintf(new_guess, "%s%s%s%s", c1, c2, c3, c4);
 
     memset(file_name, 0, sizeof(file_name));
-    sprintf(file_name, "./server/GAMES/GAME_%s.txt", plid);
+    sprintf(file_name, "./server/files/GAMES/GAME_%s.txt", plid);
     FILE* file = fopen(file_name, "r");         // Opens the file in read mode
 
     fgets(line, sizeof(line), file);            // ignore first line
@@ -306,9 +303,39 @@ int handleTryCommand(const char* plid, const char* c1, const char* c2, const cha
     return 1;
 }
 
+int handlerShowTrialsCommand(const char* plid, char* response_buffer) {
+
+    char file_name[128];
+    // verify PLID
+    if(!validPLID(plid)) {
+        sprintf(response_buffer, "ERR\n");
+        return ERROR;
+    }
+
+    if(gameOn(plid)) {
+        sprintf(file_name, "./server/files/GAMES/%s.txt");
+        transcriptShowTrialsFile(file_name, response_buffer);
+        sprintf(response_buffer, "RST ACT\n");
+    }
+    else if(!findLastGame(plid, file_name)) { //implementação desta função no pdf do stor
+        // no game history was found for this player
+        sprintf(response_buffer, "RST NOK\n");
+    }
+    else {
+        // a finished game was found
+        transcriptShowTrialsFile(file_name, response_buffer);
+        sprintf(response_buffer, "RST FIN\n");
+
+    }
+    return SUCCESS;
+}
+
+
+
+
+
 
 int resolveUDPCommands(const char* input, char* response_buffer) {
-
     int num_args;
     char cmd[32], arg1[32], arg2[32], arg3[32], arg4[32], arg5[32], arg6[32];
 
@@ -353,10 +380,45 @@ int resolveUDPCommands(const char* input, char* response_buffer) {
             else {
                 std::cerr << "Communication error.\n";
             }
-            break;            
+            break; 
+        default:
+
     }
-    return 0;
 }
+
+
+int resolveTCPCommands(const char* input, char* response_buffer) {
+    int num_args;
+    char cmd[32], plid[32];
+
+    num_args = sscanf(input, "%s %s\n", cmd, plid);
+
+    switch(num_args) {
+        case 1:
+            if(!strcmp(cmd, "SSB"))
+                handlerScoreboardCommand(response_buffer);
+            else {
+                std::cerr << "ERROR: Communication error.\n";
+                sprintf(response_buffer, "ERR\n");
+            }
+            break;
+            
+        case 2:
+            if(!strcmp(cmd, "STR"))
+                handlerShowTrialsCommand(plid, response_buffer);
+            else {
+                std::cerr << "ERROR: Communication error.\n";
+                sprintf(response_buffer, "ERR\n");
+            }
+            break;  
+        default:
+            std::cerr << "ERROR: Communication error.\n";
+            sprintf(response_buffer, "ERR\n");
+            break;
+    }
+}
+
+
 
 
 int main(int argc, char* argv[]) {
@@ -474,7 +536,7 @@ int main(int argc, char* argv[]) {
 
                     // Enviar resposta para o cliente
                     if (sendto(udp_socket, response_buffer, strlen(response_buffer), 0, (struct sockaddr*)&addr, addrlen) == ERROR) {
-                        perror("sendto");
+                        std::cerr << "ERROR: Failed to send message through UDP protocol.\n";
                         exit(1);
                     }
                 }
@@ -483,22 +545,23 @@ int main(int argc, char* argv[]) {
                     int new_fd = accept(tcp_socket, (struct sockaddr*) &addr, &addrlen);
                     if(new_fd == -1) {
                         perror("TCP Socket accept error");
-
                         exit(1);
                     }
-                    /* n = read(new_fd, buffer, 128);
+
+        
+
+                    n = read(new_fd, buffer, 128);
                     if(n == -1) {
                         perror("read");
                         exit(1);
                     }
                     write(1, "received: ", 10);
                     write(1, buffer, n);
-                    n = write(new_fd, "RST ACT 101101_game.txt 62\n\t1 - R R P P nB=1, nW=0\n\t2 - R G G B nB=2, nW=1 - 73 s to go!\n", 
-                        strlen("RST ACT 101101_game.txt 62\n\t1 - R R P P nB=1, nW=0\n\t2 - R G G B nB=2, nW=1 - 73 s to go!\n"));
+                    n = write(new_fd,);
                     if(n == -1) {
                         perror("write");
                         exit(1);
-                    } */
+                    } 
                     
                     close(new_fd);
                 }

@@ -170,7 +170,7 @@ int commandShowTrials(const char* sv_ip, const char* port, const char* plid) {
     // start reading from the tcp connection
     // stop when the header was fully read to the response buffer
     while (true) {
-        //memset(aux_buffer, 0, sizeof(aux_buffer));
+        memset(aux_buffer, 0, sizeof(aux_buffer));
         ssize_t bytes_read = read(fd, aux_buffer, max_size);
         printf("aux-buffer: %s\t, bytes_read: %ld\n", aux_buffer, bytes_read);
         if(bytes_read < 0) {
