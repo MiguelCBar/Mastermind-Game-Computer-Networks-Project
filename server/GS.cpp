@@ -128,7 +128,7 @@ int startGame(const char* plid, const char* max_playtime, const char* mode, cons
     char file_line[128], file_name[64], time_str[20];
     char color_code[5]; // 4 chars + null terminator
     
-    memset(response_buffer, 0, sizeof(response_buffer));
+    //memset(response_buffer, 0, sizeof(response_buffer));
     if(!strcmp(mode, "P")) {sprintf(response_buffer, "RSG ");}   // normal game mode
     else {sprintf(response_buffer, "RDB ");}                     // debug game mode
 
@@ -194,7 +194,6 @@ int startGame(const char* plid, const char* max_playtime, const char* mode, cons
 
 int makeNewTrial (char* response_buffer, const char* file_name, const char* plid, const char* guess, int trial_number, int* nB, int* nW) {
 
-    char guess[5];
     int verified_colors[4] = {false, false, false, false};
     int game_state;
     char color_code[5] = "RRRR";
@@ -275,7 +274,7 @@ int handlerTryCommand(const char* plid, const char* c1, const char* c2, const ch
     fclose(file); // Closes file
     
     if(std::atoi(new_trial_number) == trials && !strcmp(old_guess, new_guess)) { 
-        sprintf(response_buffer, "RTR OK\n");   // resend
+        sprintf(response_buffer, "RTR OK\n");   // resend, try already in file
         return SUCCESS;
     }
     else if (std::atoi(new_trial_number) != trials + 1) {                           
@@ -290,20 +289,20 @@ int handlerTryCommand(const char* plid, const char* c1, const char* c2, const ch
     int nB = 0, nW = 0;
     int game_state = makeNewTrial(response_buffer, file_name, plid, new_guess, trials + 1, &nB, &nW);
 
-    if (game_state = GAME_WON) {
+    if (game_state = GAME_WON) {        // game won
         endGame(plid, 'W');
+        sprintf(response_buffer, "RTR OK %d %d %d\n", new_trial_number, nB, nW);  // create OK response to player
     }
-    else if (game_state = GAME_END){    // no more tries available
+    else if (game_state = GAME_END){    // game failure -> no more tries available
         endGame(plid, 'F');
-        sprintf(response_buffer, "RTR ENT %s %s %s %s\n", c1, c2, c3, c4);  // create response to player
+        sprintf(response_buffer, "RTR ENT %s %s %s %s\n", c1, c2, c3, c4);  // create ENT response to player
 
     }
-    sprintf(response_buffer, "RTR OK %d %d %d\n", new_trial_number, nB, nW);  // create response to player
 
     return 1;
 }
 
-int handlerShowTrialsCommand(const char* plid, char* response_buffer) {
+/* int handlerShowTrialsCommand(const char* plid, char* response_buffer) {
 
     char file_name[128];
     // verify PLID
@@ -328,7 +327,7 @@ int handlerShowTrialsCommand(const char* plid, char* response_buffer) {
 
     }
     return SUCCESS;
-}
+} */
 
 
 
@@ -373,7 +372,7 @@ int resolveUDPCommands(const char* input, char* response_buffer) {
                 }
             }
             else if (!strcmp(cmd, "TRY")) {
-                if(!handleTryCommand(arg1, arg2, arg3, arg4, arg5, arg6, response_buffer)){
+                if(!handlerTryCommand(arg1, arg2, arg3, arg4, arg5, arg6, response_buffer)){
                     return 0; // nao vai haver returns em principio, só se houver erros que seja suposto mandar o programa abaixo
                 }
             }
@@ -382,12 +381,15 @@ int resolveUDPCommands(const char* input, char* response_buffer) {
             }
             break; 
         default:
+            std::cerr << "ERROR: Communication error.\n";
+            sprintf(response_buffer, "ERR\n");
+            break;
 
     }
 }
 
 
-int resolveTCPCommands(const char* input, char* response_buffer) {
+/* int resolveTCPCommands(const char* input, char* response_buffer) {
     int num_args;
     char cmd[32], plid[32];
 
@@ -417,7 +419,7 @@ int resolveTCPCommands(const char* input, char* response_buffer) {
             break;
     }
 }
-
+ */
 
 
 
@@ -531,6 +533,7 @@ int main(int argc, char* argv[]) {
                     write(1, "received: ", 10);
                     write(1, buffer, n);
                     char response_buffer[128];
+                    memset(response_buffer, 0, sizeof(response_buffer));
                     resolveUDPCommands(buffer, response_buffer);
                     
 
@@ -557,7 +560,7 @@ int main(int argc, char* argv[]) {
                     }
                     write(1, "received: ", 10);
                     write(1, buffer, n);
-                    n = write(new_fd,);
+               /*      n = write(new_fd,); */
                     if(n == -1) {
                         perror("write");
                         exit(1);

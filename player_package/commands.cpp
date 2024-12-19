@@ -149,9 +149,9 @@ int commandShowTrials(const char* sv_ip, const char* port, const char* plid) {
     memset(request_buffer, 0, sizeof(request_buffer));
     sprintf(request_buffer, "STR %s\n", plid);
     
-    ssize_t buffer_length = sizeof(request_buffer);
+    ssize_t buffer_length = strlen(request_buffer);
     while(total_bytes < buffer_length) {
-        ssize_t bytes_sent = write(fd, request_buffer + total_bytes, buffer_length - total_bytes);
+        ssize_t bytes_sent = write(fd, request_buffer, buffer_length);
         if(bytes_sent < 0) {
             std::cerr << "ERROR: failed while writing to TCP connection\n";
             freeaddrinfo(res);
@@ -167,46 +167,51 @@ int commandShowTrials(const char* sv_ip, const char* port, const char* plid) {
     size_t header_size;
     ssize_t max_size = MAX_FILE_SIZE + HEADER_SIZE;
 
-    // start reading from the tcp connection
-    // stop when the header was fully read to the response buffer
-    while (true) {
+    while(true) {
         memset(aux_buffer, 0, sizeof(aux_buffer));
         ssize_t bytes_read = read(fd, aux_buffer, max_size);
         printf("aux-buffer: %s\t, bytes_read: %ld\n", aux_buffer, bytes_read);
         if(bytes_read < 0) {
+            if (errno == ECONNRESET && response_buffer[total_bytes] == '\n') {
+                break;
+            }
             std::cerr << "ERROR: failed while reading from TCP connection, PRIMEIRO WHILE\n";
             freeaddrinfo(res);
             close(fd);
             return ERROR;
         }
+        printf("passed \n");
         if(bytes_read == 0) {
             break;
         }
-        strncat(response_buffer, aux_buffer, bytes_read);
+        strcpy(response_buffer + total_bytes, aux_buffer);
         total_bytes += bytes_read;
-        max_size -= bytes_read;
+    }
+    printf("response buffer: %s\n", response_buffer);
 
-        if((header_size = containsChar(response_buffer, strlen(response_buffer), '\n'))) {
-            sscanf(response_buffer, "%s %s %s %ld\n", cmd, status, file_name, &file_size);
-            break;
-        }
-    }
-
-    // verify if args are correct
-    if(strlen(file_name) > 24) {
-        std::cerr << "ERROR: Fname cannot be bigger than 24B\n";
-        return ERROR;
-    }
-    if(file_size > MAX_FILE_SIZE) {
-        std::cerr << "ERROR: Fsize cannot be bigger than 2KiB (2x1024B)\n";
-        return ERROR;
-    }
-    
+ 
     // create a file to store the information of the game and read the rest
     // of the file, if needed
+
+    //sscanf(response_buffer, "%s %s ", cmd, status); //////
+    sscanf(response_buffer, "%s %s %s %s ",cmd, status, file_name, file_size); //METE NA MESMA, FICA A NULL
+
     if(!strcmp(status, "ACT") || !strcmp(status, "FIN")) {
 
-        st_file = fopen(file_name, "w+");
+        char file_path[128];
+        //sscanf(response_buffer, "%s %s %s %s ",cmd, status, file_name, file_size);
+        // verify if args are correct
+        if(strlen(file_name) > 24) {
+            std::cerr << "ERROR: Fname cannot be bigger than 24B\n";
+            return ERROR;
+        }
+        if(file_size > MAX_FILE_SIZE) {
+            std::cerr << "ERROR: Fsize cannot be bigger than 2KiB (2x1024B)\n";
+            return ERROR;
+        }
+        sprintf(file_path, "./player_package/files/Games/%s", file_name);
+
+        st_file = fopen(file_path, "w+");
         total_bytes -= header_size;
         fwrite(response_buffer + header_size, 1, total_bytes, st_file);
 
@@ -240,13 +245,13 @@ int commandShowTrials(const char* sv_ip, const char* port, const char* plid) {
 
     // the player PLID does not have any game history
     else if(!strcmp(status, "NOK")) {
-        std::cout << "Something went wrong, probably player has no game history\n";
+        std::cout << "Something went wrong, probably player has no game history\n"; // NAO TEM QUE FECHAR NADA AQUI?
         return 0;
     }
 
     // error
     else {
-        std::cerr << "ERROR: Communication error.\n";
+        std::cerr << "ERROR: Communication error.\n"; //TA AQUI O ERRO (NAO TEMOS QUE FECHAR NADA?)
     }
     freeaddrinfo(res);
     fclose(st_file);
@@ -293,7 +298,7 @@ int commandScoreboard(const char* sv_ip, const char* port) {
     memset(request_buffer, 0, sizeof(request_buffer));
     sprintf(request_buffer, "SSB\n");
     
-    ssize_t buffer_length = sizeof(request_buffer);
+    ssize_t buffer_length = strlen(request_buffer);
     while(total_bytes < buffer_length) {
         ssize_t bytes_sent = write(fd, request_buffer + total_bytes, buffer_length - total_bytes);
         if(bytes_sent < 0) {
@@ -316,6 +321,8 @@ int commandScoreboard(const char* sv_ip, const char* port) {
     while (true) {
         memset(aux_buffer, 0, sizeof(aux_buffer));
         ssize_t bytes_read = read(fd, aux_buffer, max_size);
+
+        
         if(bytes_read < 0) {
             std::cerr << "ERROR: failed while reading from TCP connection\n";
             freeaddrinfo(res);
@@ -327,7 +334,7 @@ int commandScoreboard(const char* sv_ip, const char* port) {
         }
         strncat(response_buffer, aux_buffer, bytes_read);
         total_bytes += bytes_read;
-        max_size -= bytes_read;
+        //max_size -= bytes_read;
 
         if((header_size = containsChar(response_buffer, strlen(response_buffer), '\n'))) {
             sscanf(response_buffer, "%s %s %s %ld\n", cmd, status, file_name, &file_size);
