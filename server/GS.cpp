@@ -25,7 +25,7 @@ int endGame(const char* plid, const char finisher_mode) {
 
     // get file name
     memset(file_name, 0, sizeof(file_name));
-    sprintf(file_name, "./server/files/GAMES/GAME_%s.txt", plid);
+    sprintf(file_name, "GAMES/GAME_%s.txt", plid);
 
     /*ADD LAST LINE TO THE PLAYER FILE*/
     memset(file_line, 0, sizeof(file_line));
@@ -70,7 +70,7 @@ int endGame(const char* plid, const char finisher_mode) {
 
     //define player directory path
     memset(player_directory, 0, sizeof(player_directory));
-    sprintf(player_directory, "server/files/GAMES/%s", plid);
+    sprintf(player_directory, "GAMES/%s/", plid);
 
     if(!fs::exists(player_directory)) {
         if(!fs::create_directory(player_directory)) {
@@ -86,7 +86,7 @@ int endGame(const char* plid, const char finisher_mode) {
     // define new path of the file
     char new_file_name[256];
     memset(new_file_name, 0, sizeof(new_file_name));
-    sprintf(new_file_name, "%s/%s_%c.txt", player_directory, time_str, finisher_mode);
+    sprintf(new_file_name, "%s%s_%c.txt", player_directory, time_str, finisher_mode);
     fs::path new_path = new_file_name;
 
     fs::path old_path = file_name;
@@ -142,7 +142,7 @@ int startGame(const char* plid, const char* max_playtime, const char* mode, cons
     }
     // define file name
     memset(file_name, 0, sizeof(file_name));
-    sprintf(file_name, "./server/files/GAMES/GAME_%s.txt", plid);
+    sprintf(file_name, "GAMES/GAME_%s.txt", plid);
 
     FILE* file = fopen(file_name, "r");     // open file in read mode
     if(file) {
@@ -260,7 +260,7 @@ int handlerTryCommand(const char* plid, const char* c1, const char* c2, const ch
     sprintf(new_guess, "%s%s%s%s", c1, c2, c3, c4);
 
     memset(file_name, 0, sizeof(file_name));
-    sprintf(file_name, "./server/files/GAMES/GAME_%s.txt", plid);
+    sprintf(file_name, "GAMES/GAME_%s.txt", plid);
     FILE* file = fopen(file_name, "r");         // Opens the file in read mode
 
     fgets(line, sizeof(line), file);            // ignore first line

@@ -189,17 +189,12 @@ int commandShowTrials(const char* sv_ip, const char* port, const char* plid) {
     }
     printf("response buffer: %s\n", response_buffer);
 
- 
-    // create a file to store the information of the game and read the rest
-    // of the file, if needed
-
-    //sscanf(response_buffer, "%s %s ", cmd, status); //////
-    sscanf(response_buffer, "%s %s %s %s ",cmd, status, file_name, file_size); //METE NA MESMA, FICA A NULL
+    int offset = 0;
+    sscanf(response_buffer, "%s %s %s %ld%n",cmd, status, file_name, &file_size, &offset);
 
     if(!strcmp(status, "ACT") || !strcmp(status, "FIN")) {
 
         char file_path[128];
-        //sscanf(response_buffer, "%s %s %s %s ",cmd, status, file_name, file_size);
         // verify if args are correct
         if(strlen(file_name) > 24) {
             std::cerr << "ERROR: Fname cannot be bigger than 24B\n";
@@ -209,30 +204,11 @@ int commandShowTrials(const char* sv_ip, const char* port, const char* plid) {
             std::cerr << "ERROR: Fsize cannot be bigger than 2KiB (2x1024B)\n";
             return ERROR;
         }
-        sprintf(file_path, "./player_package/files/Games/%s", file_name);
+        sprintf(file_path, "player_package/games/%s", file_name);
 
         st_file = fopen(file_path, "w+");
         total_bytes -= header_size;
         fwrite(response_buffer + header_size, 1, total_bytes, st_file);
-
-        // run while the file was not fully read from the server
-        while(total_bytes < file_size) {
-            memset(aux_buffer, 0, sizeof(aux_buffer));
-            ssize_t bytes_read = read(fd, aux_buffer, max_size);
-            if(bytes_read < 0) {
-                std::cerr << "ERROR: failed while reading from TCP connection, SECOND WHILE\n";
-                freeaddrinfo(res);
-                close(fd);
-                return ERROR;
-            }
-            if(bytes_read == 0) {
-                break;
-            }
-            strncat(response_buffer, aux_buffer, bytes_read);
-            total_bytes += bytes_read;
-            max_size -= bytes_read;
-            fwrite(aux_buffer, 1, bytes_read, st_file);
-        }
 
         //print in the terminal the game information
         std::cout << "Fname: " << file_name << "\n";
