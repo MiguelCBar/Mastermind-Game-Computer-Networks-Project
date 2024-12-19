@@ -44,7 +44,7 @@ int commandEndGame(const char* sv_ip, const char* port, const char* plid) {
     }
 
     memset(request_buffer, 0, sizeof(request_buffer));
-    sprintf(request_buffer, "%s %s\n", "QUT", plid);
+    sprintf(request_buffer, "QUT %s\n", plid);
 
     // conectar com server
     n = sendto(fd, request_buffer, strlen(request_buffer), 0, res->ai_addr, res->ai_addrlen);
@@ -116,7 +116,7 @@ int commandShowTrials(const char* sv_ip, const char* port, const char* plid) {
     int fd, errcode; 
     struct addrinfo hints, *res;
     char request_buffer[256], response_buffer[MAX_FILE_SIZE + HEADER_SIZE], aux_buffer[MAX_FILE_SIZE + HEADER_SIZE];
-    char cmd[32], status[32], file_name[128];
+    char cmd[32], status[32], file_name[64];
     FILE *st_file;
     ssize_t n, total_bytes = 0, file_size;
 
@@ -164,13 +164,12 @@ int commandShowTrials(const char* sv_ip, const char* port, const char* plid) {
     /*GET THE RESPONSE FROM THE SERVER*/
     memset(response_buffer, 0, sizeof(response_buffer));
     total_bytes = 0;
-    size_t header_size;
     ssize_t max_size = MAX_FILE_SIZE + HEADER_SIZE;
 
     while(true) {
         memset(aux_buffer, 0, sizeof(aux_buffer));
         ssize_t bytes_read = read(fd, aux_buffer, max_size);
-        printf("aux-buffer: %s\t, bytes_read: %ld\n", aux_buffer, bytes_read);
+        //printf("aux-buffer: %s\t, bytes_read: %ld\n", aux_buffer, bytes_read);
         if(bytes_read < 0) {
             if (errno == ECONNRESET && response_buffer[total_bytes] == '\n') {
                 break;
@@ -180,17 +179,16 @@ int commandShowTrials(const char* sv_ip, const char* port, const char* plid) {
             close(fd);
             return ERROR;
         }
-        printf("passed \n");
         if(bytes_read == 0) {
             break;
         }
         strcpy(response_buffer + total_bytes, aux_buffer);
         total_bytes += bytes_read;
     }
-    printf("response buffer: %s\n", response_buffer);
+    //printf("response buffer: %s\n", response_buffer);
 
     int offset = 0;
-    sscanf(response_buffer, "%s %s %s %ld%n",cmd, status, file_name, &file_size, &offset);
+    sscanf(response_buffer, "%s %s %s %ld%n", cmd, status, file_name, &file_size, &offset);
 
     if(!strcmp(status, "ACT") || !strcmp(status, "FIN")) {
 
@@ -204,27 +202,26 @@ int commandShowTrials(const char* sv_ip, const char* port, const char* plid) {
             std::cerr << "ERROR: Fsize cannot be bigger than 2KiB (2x1024B)\n";
             return ERROR;
         }
-        sprintf(file_path, "player_package/games/%s", file_name);
-
+        sprintf(file_path, "player_package/files/Games/%s", file_name);
         st_file = fopen(file_path, "w+");
-        total_bytes -= header_size;
-        fwrite(response_buffer + header_size, 1, total_bytes, st_file);
+
+        total_bytes -= offset;
+        fwrite(response_buffer + offset, 1, total_bytes, st_file);
 
         //print in the terminal the game information
         std::cout << "Fname: " << file_name << "\n";
         std::cout << "Fsize: " << file_size << "\n";
         char line[256];
         fseek(st_file, 0, SEEK_SET);
-        while (fgets(line, sizeof(line), st_file))
+        while (fgets(line, sizeof(line), st_file)) {
             std::cout << line;
+        }
     }
-
     // the player PLID does not have any game history
     else if(!strcmp(status, "NOK")) {
         std::cout << "Something went wrong, probably player has no game history\n"; // NAO TEM QUE FECHAR NADA AQUI?
         return 0;
     }
-
     // error
     else {
         std::cerr << "ERROR: Communication error.\n"; //TA AQUI O ERRO (NAO TEMOS QUE FECHAR NADA?)
@@ -241,7 +238,7 @@ int commandScoreboard(const char* sv_ip, const char* port) {
     int fd, errcode; 
     struct addrinfo hints, *res;
     char request_buffer[256], response_buffer[MAX_FILE_SIZE + HEADER_SIZE], aux_buffer[MAX_FILE_SIZE + HEADER_SIZE];
-    char cmd[32], status[32], file_name[128];
+    char cmd[32], status[32], file_name[64];
     FILE *st_file;
     ssize_t n, total_bytes = 0, file_size;
 
@@ -289,18 +286,19 @@ int commandScoreboard(const char* sv_ip, const char* port) {
     /*GET THE RESPONSE FROM THE SERVER*/
     memset(response_buffer, 0, sizeof(response_buffer));
     total_bytes = 0;
-    size_t header_size;
     ssize_t max_size = MAX_FILE_SIZE + HEADER_SIZE;
 
     // start reading from the tcp connection
     // stop when the header was fully read to the response buffer
-    while (true) {
+    while(true) {
         memset(aux_buffer, 0, sizeof(aux_buffer));
         ssize_t bytes_read = read(fd, aux_buffer, max_size);
-
-        
+        //printf("aux-buffer: %s\t, bytes_read: %ld\n", aux_buffer, bytes_read);
         if(bytes_read < 0) {
-            std::cerr << "ERROR: failed while reading from TCP connection\n";
+            if (errno == ECONNRESET && response_buffer[total_bytes] == '\n') {
+                break;
+            }
+            std::cerr << "ERROR: failed while reading from TCP connection, PRIMEIRO WHILE\n";
             freeaddrinfo(res);
             close(fd);
             return ERROR;
@@ -308,60 +306,43 @@ int commandScoreboard(const char* sv_ip, const char* port) {
         if(bytes_read == 0) {
             break;
         }
-        strncat(response_buffer, aux_buffer, bytes_read);
+        strcpy(response_buffer + total_bytes, aux_buffer);
         total_bytes += bytes_read;
-        //max_size -= bytes_read;
-
-        if((header_size = containsChar(response_buffer, strlen(response_buffer), '\n'))) {
-            sscanf(response_buffer, "%s %s %s %ld\n", cmd, status, file_name, &file_size);
-            break;
-        }
     }
 
-    // verify if args are correct
-    if(strlen(file_name) > 24) {
-        std::cerr << "ERROR: Fname cannot be bigger than 24B\n";
-        return ERROR;
-    }
-    if(file_size > MAX_FILE_SIZE) {
-        std::cerr << "ERROR: Fsize cannot be bigger than 2KiB (2x1024B)\n";
-        return ERROR;
-    }
-    
+    int offset = 0;
+    sscanf(response_buffer, "%s %s %s %ld%n", cmd, status, file_name, &file_size, &offset);
+
     // create a file to store the information of the game and read the rest
     // of the file, if needed
     if(!strcmp(status, "OK")) {
 
-        st_file = fopen(file_name, "w+");
-        total_bytes -= header_size;
-        fwrite(response_buffer + header_size, 1, total_bytes, st_file);
+        char file_path[128];
 
-        // run while the file was not fully read from the server
-        while(total_bytes < file_size) {
-            memset(aux_buffer, 0, sizeof(aux_buffer));
-            ssize_t bytes_read = read(fd, aux_buffer, max_size);
-            if(bytes_read < 0) {
-                std::cerr << "ERROR: failed while reading from TCP connection\n";
-                freeaddrinfo(res);
-                close(fd);
-                return ERROR;
-            }
-            if(bytes_read == 0) {
-                break;
-            }
-            strncat(response_buffer, aux_buffer, bytes_read);
-            total_bytes += bytes_read;
-            max_size -= bytes_read;
-            fwrite(aux_buffer, 1, bytes_read, st_file);
+        // verify if args are correct
+        if(strlen(file_name) > 24) {
+            std::cerr << "ERROR: Fname cannot be bigger than 24B\n";
+            return ERROR;
         }
+        if(file_size > MAX_FILE_SIZE) {
+            std::cerr << "ERROR: Fsize cannot be bigger than 2KiB (2x1024B)\n";
+            return ERROR;
+        }
+
+        sprintf(file_path, "player_package/files/Scoreboards/%s", file_name);
+        st_file = fopen(file_path, "w+");
+
+        total_bytes -= offset;
+        fwrite(response_buffer + offset, 1, total_bytes, st_file);
 
         //print in the terminal the game information
         std::cout << "Fname: " << file_name << "\n";
         std::cout << "Fsize: " << file_size << "\n";
         char line[256];
         fseek(st_file, 0, SEEK_SET);
-        while (fgets(line, sizeof(line), st_file))
+        while (fgets(line, sizeof(line), st_file)) {
             std::cout << line;
+        }
     }
 
     // the player PLID does not have any game history
@@ -582,7 +563,7 @@ int commandTry(const char* sv_ip, const char* port, const char* c1, const char* 
         case 5:
             if(!strcmp(status, "OK")) {
                 if (!strcmp(arg2, "4")) {
-                    std::cout << "Congratulations!! You correctly guessed the secret color code in " << arg1 << " trials\n";
+                    std::cout << "Congratulations!! You correctly guessed the secret color code in " << arg1 << " trials!!\n";
                     return_value = GAME_WON;
                 }
                 else {

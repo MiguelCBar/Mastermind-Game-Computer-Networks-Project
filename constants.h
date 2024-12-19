@@ -1,21 +1,29 @@
 #ifndef _CONSTANTS_H_
 #define _CONSTANTS_H_
 
+const int ERROR = -1;
+
+// DEFAULT CONNECTION
 const char SV_IP[10] = "127.0.0.1";
 const char PORT[6] = "58058"; //58000 + GN, where GN is 58
+
+// SERVER RELATED
 const int NOT_VERBOSE = 2;
 const int VERBOSE = 3;
-const int COLOR_NUMBER = 6;
 
-const int ERROR = -1;
+// GAME RELATED
 const int GAME_WON = 1;
 const int SUCCESS = 2;
 const int GAME_END = 3;
+const int GAME_ON = 4;
 
+// SIZES
+const int COLOR_NUMBER = 6;
 const int PLID_SIZE = 6;
 const int HEADER_SIZE = 64;
 const int MAX_FILE_SIZE = 2048;
 
+// GAME END STATUS
 const char WIN = 'W';
 const char FAIL = 'F';
 const char QUIT = 'Q';

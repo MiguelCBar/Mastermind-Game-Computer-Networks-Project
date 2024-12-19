@@ -16,9 +16,12 @@
 #include "../utils.h"
 #include "../constants.h"
 
+
+int mode = NOT_VERBOSE;
+
 //provavelmente, falta mais close(tcp_socket) e close(udp_socket), nos erros
 
-int endGame(const char* plid, const char finisher_mode) {
+int endGame(const char* plid, const char finisher_mode, char* color_code) {
 
     char player_directory[128], file_name[256], time_str[16], file_line[256];
     time_t fulltime;                                         
@@ -42,7 +45,7 @@ int endGame(const char* plid, const char finisher_mode) {
     // get game start time
     int max_game_time;
     time_t start_time;
-    sscanf(file_line + 15, "%03d %*04d-%*02d-%*02d %*02d:%*02d:%*02d %ld", &max_game_time, &start_time);
+    sscanf(file_line + 14, "%03d %*04d-%*02d-%*02d %*02d:%*02d:%*02d %ld", &max_game_time, &start_time);
 
     time_t current_time_seconds = time(NULL);
     int game_duration = (int)difftime(current_time_seconds, start_time);
@@ -91,7 +94,7 @@ int endGame(const char* plid, const char finisher_mode) {
 
     fs::path old_path = file_name;
 
-    // rename file path and the player filename and move it to the new directory (./server/GAMES/PLID/file_name.txt)
+    // rename file path and the player filename and move it to the new directory (./GAMES/PLID/file_name.txt)
     fs::rename(old_path, new_path);
 
     return 1;
@@ -114,14 +117,14 @@ int handlerQuitCommand(const char* plid, char* response_buffer) {
         sprintf(response_buffer, "RQT NOK\n");      // not in a game, already timed out
         return 0;
     }
-    endGame(plid, QUIT);
+    char color_code[5] = endGame(plid, QUIT);
     sprintf(response_buffer, "RQT OK\n");           // game on, quit game
     return 1;
 }
 
 
 
-int startGame(const char* plid, const char* max_playtime, const char* mode, const char* c1, const char* c2, const char* c3, const char* c4, char* response_buffer) {
+int handlerStartCommand(const char* plid, const char* max_playtime, const char* mode, const char* c1, const char* c2, const char* c3, const char* c4, char* response_buffer) {
 
     time_t fulltime;                                         
     struct tm* currentTime;
@@ -149,10 +152,12 @@ int startGame(const char* plid, const char* max_playtime, const char* mode, cons
         memset(file_line, 0, sizeof(file_line));
         if(fgets(file_line, sizeof(file_line), file) == NULL) {return ERROR;}   // get header of the file
 
+        memset(file_line, 0, sizeof(file_line));
         fgets(file_line, sizeof(file_line), file);
         fclose(file);
+        printf("file_line: %s\n", file_line);
         // checks if the game already has tries
-        if (file_line != NULL) {
+        if (strcmp(file_line, "")) {
             if (!timeExceeded(plid)) {
                 sprintf(response_buffer + 4, "NOK\n");
                 return 0;
@@ -167,9 +172,9 @@ int startGame(const char* plid, const char* max_playtime, const char* mode, cons
         sprintf(color_code, "%s%s%s%s", c1, c2, c3, c4);
     }
 
-    time(&fulltime);                // Current time in seconds since 1970
+    time(&fulltime);                    // Current time in seconds since 1970
     currentTime = gmtime(&fulltime);
-    long initialTime = fulltime;    // Time in seconds sin 1970
+    long initialTime = fulltime;        // Time in seconds sin 1970
 
     memset(time_str, 0, sizeof(time_str));
     sprintf(time_str, "%04d-%02d-%02d %02d:%02d:%02d",
@@ -192,11 +197,10 @@ int startGame(const char* plid, const char* max_playtime, const char* mode, cons
 }
 
 
-int makeNewTrial (char* response_buffer, const char* file_name, const char* plid, const char* guess, int trial_number, int* nB, int* nW) {
+int makeNewTrial (char* response_buffer, const char* file_name, const char* plid, const char* color_code, const char* guess, int trial_number, int* nB, int* nW) {
 
     int verified_colors[4] = {false, false, false, false};
-    int game_state;
-    char color_code[5] = "RRRR";
+    int game_state = GAME_ON;
 
     for (int i = 0; i < 4; i++) {
         if (guess[i] == color_code[i]) {
@@ -225,7 +229,7 @@ int makeNewTrial (char* response_buffer, const char* file_name, const char* plid
     char trial_line[128];
     memset(trial_line, 0, sizeof(trial_line));
     int time_passed = getTimePassed(plid);
-    sprintf(trial_line, "T: ", guess, nB, nW, time_passed);         // create trial line
+    sprintf(trial_line, "T: %s %d %d %d", guess, *nB, *nW, time_passed);         // create trial line
 
     // Append new try to the game file
     FILE* file = fopen(file_name, "a");
@@ -234,6 +238,8 @@ int makeNewTrial (char* response_buffer, const char* file_name, const char* plid
     }
     fprintf(file, "%s\n", trial_line);
     fclose(file);
+    
+    return game_state;
 }
 
 
@@ -245,33 +251,38 @@ int handlerTryCommand(const char* plid, const char* c1, const char* c2, const ch
     }
     if (!gameOn(plid)) {    // does not have a game going
         sprintf(response_buffer, "RTR NOK\n");
+        std::cerr << "ERROR: Not a game Going\n";
         return 0;
     }
-    if (timeExceeded(plid)) {
-        endGame(plid, TIMEOUT); // TESTAR ERROS
-        sprintf(response_buffer, "RTR ETM\n");
-        return 0;
-    }
-    char old_guess[5], new_guess[5], file_name[64];
+    char color_code[5], old_guess[5], new_guess[5], file_name[64];
     char line[256]; // Buffer para armazenar cada linha lida do ficheiro
     int trials = 0;
     bool duplicated = false;
 
-    sprintf(new_guess, "%s%s%s%s", c1, c2, c3, c4);
-
     memset(file_name, 0, sizeof(file_name));
     sprintf(file_name, "GAMES/GAME_%s.txt", plid);
-    FILE* file = fopen(file_name, "r");         // Opens the file in read mode
+    FILE* file = fopen(file_name, "r");             // Opens the file in read mode
+    fgets(line, sizeof(line), file);                // gets header of the game
+    sscanf(line + 9, "%s", color_code);             // gets the right color code
+    fclose(file);
 
-    fgets(line, sizeof(line), file);            // ignore first line
-    while (fgets(line, sizeof(line), file)) {   // while there's more lines in the file
-        trials++;                               // count how many trials have been done
-        sscanf(line, "T: %4s ", old_guess);     // get color code of the trial
-        if (!strcmp(old_guess, new_guess)) {    // check if there's a duplicated guess
+    if (timeExceeded(plid)) {
+        endGame(plid, TIMEOUT); // TESTAR ERROS
+        sprintf(response_buffer, "RTR ETM %s\n", color_code);
+        return 0;
+    }
+
+    file = fopen(file_name, "r");                   // Opens the file in read mode
+    sprintf(new_guess, "%s%s%s%s", c1, c2, c3, c4); // creates the new guess
+    fgets(line, sizeof(line), file);                // ignores the first line
+    while (fgets(line, sizeof(line), file)) {       // while there's more lines in the file
+        trials++;                                   // count how many trials have been done
+        sscanf(line, "T: %4s ", old_guess);         // get color code of the trial
+        if (!strcmp(old_guess, new_guess)) {        // check if there's a duplicated guess
             duplicated = true;
         }
     }
-    fclose(file); // Closes file
+    fclose(file); // closes file
     
     if(std::atoi(new_trial_number) == trials && !strcmp(old_guess, new_guess)) { 
         sprintf(response_buffer, "RTR OK\n");   // resend, try already in file
@@ -287,24 +298,22 @@ int handlerTryCommand(const char* plid, const char* c1, const char* c2, const ch
     }
 
     int nB = 0, nW = 0;
-    int game_state = makeNewTrial(response_buffer, file_name, plid, new_guess, trials + 1, &nB, &nW);
-
-    if (game_state = GAME_WON) {        // game won
+    int game_state = makeNewTrial(response_buffer, file_name, plid, color_code, new_guess, trials + 1, &nB, &nW);
+    printf("game state: %d", game_state);
+    if (game_state == GAME_WON) {        // game won
         endGame(plid, 'W');
-        sprintf(response_buffer, "RTR OK %d %d %d\n", new_trial_number, nB, nW);  // create OK response to player
+        sprintf(response_buffer, "RTR OK %s %d %d\n", new_trial_number, nB, nW);  // create OK response to player
     }
-    else if (game_state = GAME_END){    // game failure -> no more tries available
+    else if (game_state == GAME_END){    // game failure -> no more tries available
         endGame(plid, 'F');
-        sprintf(response_buffer, "RTR ENT %s %s %s %s\n", c1, c2, c3, c4);  // create ENT response to player
-
+        sprintf(response_buffer, "RTR ENT %s\n", color_code);  // create ENT response to player
     }
-
     return 1;
 }
 
 /* int handlerShowTrialsCommand(const char* plid, char* response_buffer) {
 
-    char file_name[128];
+    char file_path[128];
     // verify PLID
     if(!validPLID(plid)) {
         sprintf(response_buffer, "ERR\n");
@@ -312,17 +321,17 @@ int handlerTryCommand(const char* plid, const char* c1, const char* c2, const ch
     }
 
     if(gameOn(plid)) {
-        sprintf(file_name, "./server/files/GAMES/%s.txt");
-        transcriptShowTrialsFile(file_name, response_buffer);
+        sprintf(file_path, "GAMES/%s.txt");
+        transcriptShowTrialsFile(file_path, response_buffer);
         sprintf(response_buffer, "RST ACT\n");
     }
-    else if(!findLastGame(plid, file_name)) { //implementação desta função no pdf do stor
+    else if(!findLastGame(plid, file_path)) { //implementação desta função no pdf do stor
         // no game history was found for this player
         sprintf(response_buffer, "RST NOK\n");
     }
     else {
         // a finished game was found
-        transcriptShowTrialsFile(file_name, response_buffer);
+        transcriptShowTrialsFile(file_path, response_buffer);
         sprintf(response_buffer, "RST FIN\n");
 
     }
@@ -332,22 +341,27 @@ int handlerTryCommand(const char* plid, const char* c1, const char* c2, const ch
 
 
 
-
-
 int resolveUDPCommands(const char* input, char* response_buffer) {
     int num_args;
     char cmd[32], arg1[32], arg2[32], arg3[32], arg4[32], arg5[32], arg6[32];
 
-    num_args = sscanf(input, "%s %s %s %s %s %s %s\n", cmd, arg1, arg2, arg3, arg4, arg5, arg6);
 
+
+
+    num_args = sscanf(input, "%s %s %s %s %s %s %s\n", cmd, arg1, arg2, arg3, arg4, arg5, arg6);
+    printf("num_args: %s\n", cmd);
+    printf("arg1: %s\n", arg1);
+    printf("arg2: %s\n", arg2);
+    printf("arg3: %s\n", arg3);
+    printf("arg4: %s\n", arg4);
+    printf("num_args: %d\n", num_args);
     switch(num_args) {
         
         case 2:
             if (!strcmp(cmd, "QUT")) {
-                /* if(!endGame()) {
-                    return 0;
-                } */
-               ;
+                handlerQuitCommand(arg1, response_buffer);
+                printf("response_buffer fora do quit: %s\n", response_buffer);
+
             }
             else {
                 std::cerr << "Communication error.\n";
@@ -356,18 +370,18 @@ int resolveUDPCommands(const char* input, char* response_buffer) {
             
         case 3:
             if (!strcmp(cmd, "SNG")){
-                if(!startGame(arg1, arg2, "P", arg3, arg4, arg5, arg6, response_buffer)){
+                if(!handlerStartCommand(arg1, arg2, "P", arg3, arg4, arg5, arg6, response_buffer)){
                     return 0; // nao vai haver returns em principio, só se houver erros que seja suposto mandar o programa abaixo
                 }
             }
             else {
-                std::cerr << "Communication error.\n";
+                std::cerr << "ERROR: Communication error.\n";
             }
             break;
 
         case 7:
             if (!strcmp(cmd, "DBG")){
-                if(!startGame(arg1, arg2, "D", arg3, arg4, arg5, arg6, response_buffer)){
+                if(!handlerStartCommand(arg1, arg2, "D", arg3, arg4, arg5, arg6, response_buffer)){
                     return 0; // nao vai haver returns em principio, só se houver erros que seja suposto mandar o programa abaixo
                 }
             }
@@ -377,7 +391,7 @@ int resolveUDPCommands(const char* input, char* response_buffer) {
                 }
             }
             else {
-                std::cerr << "Communication error.\n";
+                std::cerr << "ERROR: Communication error.\n";
             }
             break; 
         default:
@@ -386,6 +400,7 @@ int resolveUDPCommands(const char* input, char* response_buffer) {
             break;
 
     }
+    return SUCCESS;
 }
 
 
@@ -425,12 +440,12 @@ int resolveUDPCommands(const char* input, char* response_buffer) {
 
 int main(int argc, char* argv[]) {
 
-    int mode = NOT_VERBOSE, udp_socket, tcp_socket, n;
+    int udp_socket, tcp_socket, n;
     struct addrinfo hints, *res, *p;
     struct sockaddr_in addr;
     socklen_t addrlen;
     const char* port;
-    char buffer[128];
+    char request_buffer[128];
 
     int out_fds;
     struct timeval timeout;
@@ -512,8 +527,7 @@ int main(int argc, char* argv[]) {
     while(true) {
         fd_set test_fd_sockets = fd_sockets; //o select altera o fd_sockets, por isso temos de enviar uma cópia
         memset((void*)&timeout, 0, sizeof(timeout)); //not sure se é preciso timeout, mas estava no ficheiro do stor
-        timeout.tv_sec = 10;
-        out_fds = select(FD_SETSIZE, &test_fd_sockets, (fd_set*) NULL, (fd_set*)NULL, (struct timeval*) &timeout);
+        out_fds = select(FD_SETSIZE, &test_fd_sockets, (fd_set*) NULL, (fd_set*)NULL, NULL);
         switch(out_fds) {
             case ERROR:
                 perror("Error in Select function");
@@ -524,19 +538,20 @@ int main(int argc, char* argv[]) {
             default:
                 addrlen = sizeof(addr);
                 if(FD_ISSET(udp_socket, &test_fd_sockets)) {
-                    n = recvfrom(udp_socket, buffer, sizeof(buffer), 0, (struct sockaddr*)&addr, &addrlen);
+                    memset(request_buffer, 0, sizeof(request_buffer));
+                    n = recvfrom(udp_socket, request_buffer, sizeof(request_buffer), 0, (struct sockaddr*)&addr, &addrlen);
                     if (n == -1) {
                         perror("recvfrom");
                         exit(1);
                     }
                     // Exibir a mensagem recebida
                     write(1, "received: ", 10);
-                    write(1, buffer, n);
+                    write(1, request_buffer, n);
                     char response_buffer[128];
                     memset(response_buffer, 0, sizeof(response_buffer));
-                    resolveUDPCommands(buffer, response_buffer);
+                    resolveUDPCommands(request_buffer, response_buffer);
                     
-
+                    printf("response_buffer: %s\n", response_buffer);
                     // Enviar resposta para o cliente
                     if (sendto(udp_socket, response_buffer, strlen(response_buffer), 0, (struct sockaddr*)&addr, addrlen) == ERROR) {
                         std::cerr << "ERROR: Failed to send message through UDP protocol.\n";
@@ -553,13 +568,13 @@ int main(int argc, char* argv[]) {
 
         
 
-                    n = read(new_fd, buffer, 128);
+                    n = read(new_fd, request_buffer, 128);
                     if(n == -1) {
                         perror("read");
                         exit(1);
                     }
                     write(1, "received: ", 10);
-                    write(1, buffer, n);
+                    write(1, request_buffer, n);
                /*      n = write(new_fd,); */
                     if(n == -1) {
                         perror("write");
