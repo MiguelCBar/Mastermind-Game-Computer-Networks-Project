@@ -78,7 +78,7 @@ int commandEndGame(const char* sv_ip, const char* port, const char* plid) {
         case 2:
             if(!strcmp(status, "NOK")) {
                 std::cout << "You do not have an ongoing game.\n";
-                return_value = ERROR;
+                return_value = SUCCESS;
             }
             else if(!strcmp(status, "ERR")) {
                 std::cout << "FAIL: Something went wrong.\n";
@@ -202,7 +202,7 @@ int commandShowTrials(const char* sv_ip, const char* port, const char* plid) {
             std::cerr << "ERROR: Fsize cannot be bigger than 2KiB (2x1024B)\n";
             return ERROR;
         }
-        sprintf(file_path, "player_package/files/Games/%s", file_name);
+        sprintf(file_path, "player_package/games/%s", file_name);
         st_file = fopen(file_path, "w+");
 
         total_bytes -= offset;
@@ -283,6 +283,7 @@ int commandScoreboard(const char* sv_ip, const char* port) {
         total_bytes += bytes_sent;
     }
 
+
     /*GET THE RESPONSE FROM THE SERVER*/
     memset(response_buffer, 0, sizeof(response_buffer));
     total_bytes = 0;
@@ -309,14 +310,12 @@ int commandScoreboard(const char* sv_ip, const char* port) {
         strcpy(response_buffer + total_bytes, aux_buffer);
         total_bytes += bytes_read;
     }
-
     int offset = 0;
     sscanf(response_buffer, "%s %s %s %ld%n", cmd, status, file_name, &file_size, &offset);
 
     // create a file to store the information of the game and read the rest
     // of the file, if needed
     if(!strcmp(status, "OK")) {
-
         char file_path[128];
 
         // verify if args are correct
@@ -329,7 +328,7 @@ int commandScoreboard(const char* sv_ip, const char* port) {
             return ERROR;
         }
 
-        sprintf(file_path, "player_package/files/Scoreboards/%s", file_name);
+        sprintf(file_path, "player_package/scoreboards/%s", file_name);
         st_file = fopen(file_path, "w+");
 
         total_bytes -= offset;
@@ -401,7 +400,7 @@ int commandStartGame(const char* sv_ip, const char* port, const char* plid, cons
     }
 
     memset(request_buffer, 0, sizeof(request_buffer));
-    sprintf(request_buffer, "SNG %s %s\n", plid, max_playtime);
+    sprintf(request_buffer, "SNG %s %03d\n", plid, std::atoi(max_playtime));
 
     // conectar com server
     n = sendto(fd, request_buffer, strlen(request_buffer), 0, res->ai_addr, res->ai_addrlen);

@@ -80,23 +80,16 @@ int timeExceeded(const char* header) {
     int max_game_time, game_duration;
     sscanf(header + 14, "%03d", &max_game_time);
 
-    game_duration = getTimePassed(header); // VERIFICAR SE É PRECISO PASSAR O START TIME PARA TIME PORQUE FOI LIDO COM %ld
-
-    std::cout << "\nTIME EXCEEDED FUNCTION\ngame_duration: " << game_duration << "\n" << "max_game_time: " << max_game_time << "\n\n\n";
+    game_duration = getTimePassed(header);
 
     return max_game_time <= game_duration;
 }
 
 
 
-int getOngoingGameHeader(const char* plid, char* header) {
+int getGameHeader(const char* file_name, char* header) {
 
     FILE* file;
-    char file_name[64];
-
-    memset(file_name, 0, sizeof(file_name));
-    sprintf(file_name, "GAMES/GAME_%s.txt", plid);
-
     file = fopen(file_name, "r");
     if(!file) {return ERROR;}
 
@@ -122,21 +115,17 @@ void displayColorCode(const char* color_code, char* spaced_color_code) {
     spaced_color_code[j] = '\0';                // Null-terminate the output string
 }
 
-
-/* int transcriptShowTrialsFile(const char* file_path, char* response_buffer) {
+/* int transcriptShowTrialsFile(const char* file_name, const char* header, char* response_buffer) {
     
     FILE* file;
-    char file_name[32];
-    int file_size;
+    ssize_t file_size;
+    char cmd[32], status[32], file_name[32];
 
-
-    char 
-    file = fopen(file_path, "r");
+    sscanf
+    file = fopen(file_name, "r");
     if(!file) {
         return ERROR;
     }
-    file_name = strrchr(file_path, '/'); 
-    file_name++;
 
 
 

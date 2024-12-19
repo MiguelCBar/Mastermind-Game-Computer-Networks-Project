@@ -105,14 +105,16 @@ int endGame(const char* plid, const char finisher_mode) {
 int handlerQuitCommand(const char* plid, char* response_buffer) {
 
     char header[HEADER_SIZE];
-    char color_code[COLOR_CODE_SIZE];
+    char color_code[COLOR_CODE_SIZE], spaced_color_code[8], file_name[64];
 
     if(!validPLID(plid)) {
         sprintf(response_buffer, "RQT ERR\n");
         return ERROR;
     }
     memset(header, 0, sizeof(header));
-    if(getOngoingGameHeader(plid, header) == ERROR) {
+    memset(file_name, 0, sizeof(header));
+    sprintf(file_name, "GAMES/GAME_%s.txt", plid);
+    if(getGameHeader(file_name, header) == ERROR) {
         sprintf(response_buffer, "RQT NOK\n");      // not in a game, cant quit
         return 0;
     }
@@ -123,8 +125,9 @@ int handlerQuitCommand(const char* plid, char* response_buffer) {
     }
     memset(color_code, 0, COLOR_CODE_SIZE);
     getKeyColorCode(header, color_code);
+    displayColorCode(color_code, spaced_color_code);
     endGame(plid, QUIT);
-    sprintf(response_buffer, "RQT OK %s\n", color_code);           // game on, quit game
+    sprintf(response_buffer, "RQT OK %s\n", spaced_color_code);           // game on, quit game
     return SUCCESS;
 }
 
@@ -205,7 +208,7 @@ int handlerStartCommand(const char* plid, const char* max_playtime, const char* 
 }
 
 
-int makeNewTrial (char* response_buffer, const char* file_name, const char* plid, const char* color_code, const char* guess, int trial_number, int* nB, int* nW) {
+int makeNewTrial (const char* file_name, const char* header, const char* color_code, const char* guess, int trial_number, int* nB, int* nW) {
 
     int verified_colors[4] = {false, false, false, false};
     int game_state = GAME_ON;
@@ -234,18 +237,20 @@ int makeNewTrial (char* response_buffer, const char* file_name, const char* plid
         game_state = GAME_END;
     }
 
+
     char trial_line[128];
     memset(trial_line, 0, sizeof(trial_line));
-    int time_passed = getTimePassed(plid);
+    int time_passed = getTimePassed(header);
     sprintf(trial_line, "T: %s %d %d %d", guess, *nB, *nW, time_passed);         // create trial line
 
-    // Append new try to the game file
-    FILE* file = fopen(file_name, "a");
+    FILE* file = fopen(file_name, "a+");
     if (!file) {
         return ERROR;       // ERROR a abrir ficheiro
     }
+
     fprintf(file, "%s\n", trial_line);
     fclose(file);
+    // Append new try to the game file
     
     return game_state;
 }
@@ -258,14 +263,16 @@ int handlerTryCommand(const char* plid, const char* c1, const char* c2, const ch
         return ERROR;
     }
 
-    char header[HEADER_SIZE];
+    char header[HEADER_SIZE], file_name[64];
     memset(header, 0, sizeof(header));
-    if(getOngoingGameHeader(plid, header) == ERROR) {
+    memset(file_name, 0, sizeof(header));
+    sprintf(file_name, "GAMES/GAME_%s.txt", plid);
+    if(getGameHeader(file_name, header) == ERROR) {
         sprintf(response_buffer, "RTR NOK\n");      // not in a game
         return 0;
     }
 
-    char color_code[5], spaced_color_code[5];
+    char color_code[5], spaced_color_code[8];
     memset(color_code, 0, COLOR_CODE_SIZE);
     getKeyColorCode(header, color_code);
     memset(spaced_color_code, 0, sizeof(spaced_color_code));
@@ -276,13 +283,10 @@ int handlerTryCommand(const char* plid, const char* c1, const char* c2, const ch
         sprintf(response_buffer, "RTR ETM %s\n", spaced_color_code);
         return 0;
     }
-    char old_guess[5], new_guess[5], file_name[64];
+    char old_guess[5], new_guess[5];
     char line[256]; // Buffer to store file line
     int trials = 0;
     bool duplicated = false;
-
-    memset(file_name, 0, sizeof(file_name));
-    sprintf(file_name, "GAMES/GAME_%s.txt", plid);
 
     FILE* file = fopen(file_name, "r");             // Opens the file in read mode
     sprintf(new_guess, "%s%s%s%s", c1, c2, c3, c4); // creates the new guess
@@ -310,46 +314,48 @@ int handlerTryCommand(const char* plid, const char* c1, const char* c2, const ch
     }
 
     int nB = 0, nW = 0;
-    int game_state = makeNewTrial(response_buffer, file_name, plid, color_code, new_guess, trials + 1, &nB, &nW);
+    int game_state = makeNewTrial(file_name, header, color_code, new_guess, trials + 1, &nB, &nW);
     printf("game state: %d", game_state);
     if (game_state == GAME_WON) {        // game won
         endGame(plid, 'W');
         sprintf(response_buffer, "RTR OK %s %d %d\n", new_trial_number, nB, nW);  // create OK response to player
     }
-    else if (game_state == GAME_END){    // game failure -> no more tries available
+    else if (game_state == GAME_END) {    // game failure -> no more tries available
         endGame(plid, 'F');
         sprintf(response_buffer, "RTR ENT %s\n", spaced_color_code);  // create ENT response to player
+    }
+    else if (game_state == GAME_ON) {
+        sprintf(response_buffer, "RTR OK %s %d %d\n", new_trial_number, nB, nW);
     }
     return 1;
 }
 
 /* int handlerShowTrialsCommand(const char* plid, char* response_buffer) {
 
-    char file_path[128];
+    char header[HEADER_SIZE], file_name[64];
     // verify PLID
     if(!validPLID(plid)) {
         sprintf(response_buffer, "ERR\n");
         return ERROR;
     }
-
-    if(gameOn(plid)) {
-        sprintf(file_path, "GAMES/%s.txt");
-        transcriptShowTrialsFile(file_path, response_buffer);
-        sprintf(response_buffer, "RST ACT\n");
+    memset(file_name, 0, sizeof(file_name));
+    sprintf(file_name, "GAMES/GAME_%s.txt", plid);
+    if(getGameHeader(file_name, header)) {
+        transcriptShowTrialsFile(file_name, header, response_buffer);
     }
-    else if(!findLastGame(plid, file_path)) { //implementação desta função no pdf do stor
+
+    memset(file_name, 0, sizeof(file_name));
+    if(!findLastGame(plid, file_name)) { //implementação desta função no pdf do stor
         // no game history was found for this player
         sprintf(response_buffer, "RST NOK\n");
     }
     else {
         // a finished game was found
-        transcriptShowTrialsFile(file_path, response_buffer);
-        sprintf(response_buffer, "RST FIN\n");
-
+        getGameHeader(file_name, header);
+        transcriptShowTrialsFile(file_path, header, response_buffer);
     }
     return SUCCESS;
 } */
-
 
 
 
@@ -361,18 +367,11 @@ int resolveUDPCommands(const char* input, char* response_buffer) {
 
 
     num_args = sscanf(input, "%s %s %s %s %s %s %s\n", cmd, arg1, arg2, arg3, arg4, arg5, arg6);
-    printf("num_args: %s\n", cmd);
-    printf("arg1: %s\n", arg1);
-    printf("arg2: %s\n", arg2);
-    printf("arg3: %s\n", arg3);
-    printf("arg4: %s\n", arg4);
-    printf("num_args: %d\n", num_args);
     switch(num_args) {
         
         case 2:
             if (!strcmp(cmd, "QUT")) {
                 handlerQuitCommand(arg1, response_buffer);
-                printf("response_buffer fora do quit: %s\n", response_buffer);
 
             }
             else {
@@ -559,6 +558,7 @@ int main(int argc, char* argv[]) {
                     // Exibir a mensagem recebida
                     write(1, "received: ", 10);
                     write(1, request_buffer, n);
+
                     char response_buffer[128];
                     memset(response_buffer, 0, sizeof(response_buffer));
                     resolveUDPCommands(request_buffer, response_buffer);
@@ -587,6 +587,8 @@ int main(int argc, char* argv[]) {
                     }
                     write(1, "received: ", 10);
                     write(1, request_buffer, n);
+
+                    char response_buffer[MAX_FILE_SIZE + HEADER_SIZE];
                /*      n = write(new_fd,); */
                     if(n == -1) {
                         perror("write");

@@ -10,7 +10,7 @@ void generateColorCode(char* color_code);
 int getTimePassed(const char* header);
 int timeExceeded(const char* header);
 int transcriptShowTrialsFile(const char* file_path, char* response_buffer);
-int getOngoingGameHeader(const char* plid, char* header);
+int getGameHeader(const char* file_path, char* header);
 void getKeyColorCode(const char* header, char* color_code);
 void displayColorCode(const char* color_code, char* spaced_color_code);
 

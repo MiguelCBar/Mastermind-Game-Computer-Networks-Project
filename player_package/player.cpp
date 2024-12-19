@@ -44,6 +44,7 @@ int main(int argc, char* argv[]) {
 
     //No while, falta verificar mensagens de ERR, não sei se é suposto acabar o programa ou só dizer que foi um return invalido
     std::cout << "\nHELLO Good sir! I see you want to play the MASTERMIND game.\nLets hop right into it!\n";
+    std::cout << "----------------------------------\n";
     while(true) {
 
         std::string input;
