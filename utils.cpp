@@ -3,6 +3,7 @@
 #include <fstream>
 #include <string.h>
 #include <iostream>
+#include <dirent.h>
 
 bool validPLID(const std::string& input) {
     // Verifica se tem exatamente 6 caracteres e todos são dígitos
@@ -93,7 +94,9 @@ int getGameHeader(const char* file_name, char* header) {
     file = fopen(file_name, "r");
     if(!file) {return ERROR;}
 
-    if(fgets(header, HEADER_SIZE, file) == NULL) {return ERROR;}
+    if(fgets(header, HEADER_SIZE, file) == NULL) {
+        printf("entrou mal\n");
+        return ERROR;}
     fclose(file);
 
     return SUCCESS;
@@ -115,27 +118,89 @@ void displayColorCode(const char* color_code, char* spaced_color_code) {
     spaced_color_code[j] = '\0';                // Null-terminate the output string
 }
 
-/* int transcriptShowTrialsFile(const char* file_name, const char* header, char* response_buffer) {
+int transcriptOngoingGameFile(const char* file_path, const char* header, char* response_buffer) {
     
     FILE* file;
-    ssize_t file_size;
-    char cmd[32], status[32], file_name[32];
+    size_t offset = 0;
+    char file_name[32], file_data[MAX_FILE_SIZE], file_tries_data[MAX_FILE_SIZE];
 
-    sscanf
-    file = fopen(file_name, "r");
+    int plid, gameTime, trials_count = 0;
+    char date[11], time[9];
+
+    sscanf(header, "%d %*1s %*4s %03d %s %s", &plid, &gameTime, date, time);
+
+    memset(file_name, 0, sizeof(file_name));
+    sprintf(file_name, "STATE_%d.txt", plid);
+
+    file = fopen(file_path, "r");
     if(!file) {
         return ERROR;
     }
+    char line[64];
+    memset(line, 0, sizeof(line));
+    if(fgets(line, HEADER_SIZE, file) == NULL) {
+        return ERROR;
+    }
+    char color_code[COLOR_CODE_SIZE];
+    int nB, nW, try_time;
+    memset(line, 0, sizeof(line));
+    memset(file_tries_data, 0, sizeof(file_tries_data));
+    while(fgets(line, HEADER_SIZE, file)) {
+        sscanf(line, "T: %4s %d %d %d", color_code, &nB, &nW, &try_time);
+        offset += sprintf(file_tries_data + offset, "Trial: %s, nB: %d\tnW: %d at %d sec\n", color_code, nB, nW, try_time);
+        trials_count++;
+    }
 
+    fclose(file);
+    int time_left = gameTime - getTimePassed(header);
 
+    offset = 0;
+    memset(file_data, 0, sizeof(file_data));
+    offset += sprintf(file_data + offset, "--------------------------------\nActive game found: PLAYER %d\n\n\nGame initiated: %s %s\nTime to complete: %d seconds\n", plid, date, time, gameTime);
+    if(trials_count == 0) {
+        offset += sprintf(file_data + offset, "\n\tNO TRANSACTIONS FOUND\n");
+    }
+    else {
+        offset += sprintf(file_data + offset, "\n\tTRANSACTIONS FOUND: %d\n\n", trials_count);
+    }
+    offset += sprintf(file_data + offset, "%s\n\n\tREMAINING TIME LEFT: %d\n--------------------------------\n", file_tries_data, time_left);
 
-    sprintf(response_buffer, "RST ACT ");
-    response_buffer
-    strcpy(response_buffer, file_name);
-
+    sprintf(response_buffer, "RST ACT %s %ld %s", file_name, strlen(file_data), file_data);
 
     return SUCCESS;
-} */
+}
+
+int FindLastGame(char *PLID, char *fname) {
+
+    struct dirent **filelist;
+    int n_entries, found;
+    char dirname[20];
+
+    sprintf(dirname, "GAMES/%s/", PLID);
+
+    n_entries = scandir(dirname, &filelist, 0, alphasort);
+
+    found = 0;
+
+    if (n_entries <= 0)
+        return (0);
+    else
+    {
+        while (n_entries--)
+        {
+            if (filelist[n_entries]->d_name[0] != '.' && !found)
+            {
+                sprintf(fname, "GAMES/%s/%s", PLID, filelist[n_entries]->d_name);
+                found = 1;
+            }
+            free(filelist[n_entries]);
+        }
+        free(filelist);
+    }
+
+    return (found);
+}
+
     
     
 

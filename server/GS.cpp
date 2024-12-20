@@ -137,7 +137,7 @@ int handlerStartCommand(const char* plid, const char* max_playtime, const char* 
 
     time_t fulltime;                                         
     struct tm* currentTime;
-    char file_line[128], file_name[64], time_str[20];
+    char file_line[128], file_name[64], time_str[20], header[HEADER_SIZE];
     char color_code[5]; // 4 chars + null terminator
     
     if(!strcmp(mode, "P")) {
@@ -168,10 +168,14 @@ int handlerStartCommand(const char* plid, const char* max_playtime, const char* 
         printf("file_line: %s\n", file_line);
         // checks if the game already has tries
         if (strcmp(file_line, "")) {
-            if (!timeExceeded(plid)) {
+            getGameHeader(file_name, header);
+            if (!timeExceeded(header)) {
                 sprintf(response_buffer + 4, "NOK\n");
                 return 0;
             }
+            endGame(plid, TIMEOUT);
+            sprintf(response_buffer + 4, "OK\n");
+            return 0;
         }
     }
 
@@ -330,7 +334,7 @@ int handlerTryCommand(const char* plid, const char* c1, const char* c2, const ch
     return 1;
 }
 
-/* int handlerShowTrialsCommand(const char* plid, char* response_buffer) {
+int handlerShowTrialsCommand(char* plid, char* response_buffer) {
 
     char header[HEADER_SIZE], file_name[64];
     // verify PLID
@@ -340,22 +344,25 @@ int handlerTryCommand(const char* plid, const char* c1, const char* c2, const ch
     }
     memset(file_name, 0, sizeof(file_name));
     sprintf(file_name, "GAMES/GAME_%s.txt", plid);
+    printf("filename: %s\n", file_name);
     if(getGameHeader(file_name, header)) {
-        transcriptShowTrialsFile(file_name, header, response_buffer);
+        transcriptOngoingGameFile(file_name, header, response_buffer);
+        return SUCCESS;
     }
 
     memset(file_name, 0, sizeof(file_name));
-    if(!findLastGame(plid, file_name)) { //implementação desta função no pdf do stor
+    if(!FindLastGame(plid, file_name)) { //implementação desta função no pdf do stor
         // no game history was found for this player
+        printf("tamale\n");
         sprintf(response_buffer, "RST NOK\n");
     }
     else {
         // a finished game was found
         getGameHeader(file_name, header);
-        transcriptShowTrialsFile(file_path, header, response_buffer);
+        //transcriptFinishedGameFile(file_path, header, response_buffer);
     }
     return SUCCESS;
-} */
+}
 
 
 
@@ -415,7 +422,7 @@ int resolveUDPCommands(const char* input, char* response_buffer) {
 }
 
 
-/* int resolveTCPCommands(const char* input, char* response_buffer) {
+int resolveTCPCommands(const char* input, char* response_buffer) {
     int num_args;
     char cmd[32], plid[32];
 
@@ -424,7 +431,8 @@ int resolveUDPCommands(const char* input, char* response_buffer) {
     switch(num_args) {
         case 1:
             if(!strcmp(cmd, "SSB"))
-                handlerScoreboardCommand(response_buffer);
+                //handlerScoreboardCommand(response_buffer);
+                ;
             else {
                 std::cerr << "ERROR: Communication error.\n";
                 sprintf(response_buffer, "ERR\n");
@@ -444,8 +452,8 @@ int resolveUDPCommands(const char* input, char* response_buffer) {
             sprintf(response_buffer, "ERR\n");
             break;
     }
+    return SUCCESS;
 }
- */
 
 
 
@@ -456,7 +464,6 @@ int main(int argc, char* argv[]) {
     struct sockaddr_in addr;
     socklen_t addrlen;
     const char* port;
-    char request_buffer[128];
 
     int out_fds;
     struct timeval timeout;
@@ -548,6 +555,7 @@ int main(int argc, char* argv[]) {
                 break;
             default:
                 addrlen = sizeof(addr);
+                char request_buffer[128];
                 if(FD_ISSET(udp_socket, &test_fd_sockets)) {
                     memset(request_buffer, 0, sizeof(request_buffer));
                     n = recvfrom(udp_socket, request_buffer, sizeof(request_buffer), 0, (struct sockaddr*)&addr, &addrlen);
@@ -578,23 +586,52 @@ int main(int argc, char* argv[]) {
                         exit(1);
                     }
 
-        
+                    ssize_t total_bytes = 0;
+                    char aux_buffer[128];
+                    memset(request_buffer, 0, sizeof(request_buffer));
 
-                    n = read(new_fd, request_buffer, 128);
-                    if(n == -1) {
-                        perror("read");
-                        exit(1);
-                    }
-                    write(1, "received: ", 10);
-                    write(1, request_buffer, n);
-
+                    //read from TCP Socket
+                    /* while(true) {
+                        memset(aux_buffer, 0, sizeof(aux_buffer));
+                        ssize_t bytes_read = read(new_fd, aux_buffer, 128);
+                        printf("aux-buffer: %sbytes_read: %ld\n", aux_buffer, bytes_read);
+                        if(bytes_read < 0) {
+                            if (errno == ECONNRESET && request_buffer[total_bytes] == '\n') {
+                                break;
+                            }
+                            std::cerr << "ERROR: failed while reading from TCP connection\n";
+                            freeaddrinfo(res);
+                            close(new_fd);
+                            exit(1);
+                        }
+                        if(bytes_read == 0) {
+                            break;
+                        }
+                        strcpy(request_buffer + total_bytes, aux_buffer);
+                        total_bytes += bytes_read;
+                        printf("ta aqui\n");
+                    } */
+                    printf("saiu bem\n");
+                    memset(aux_buffer, 0, sizeof(aux_buffer));
+                    ssize_t bytes_read = read(new_fd, aux_buffer, 128);
+                    strcpy(request_buffer + total_bytes, aux_buffer);
+                    // Resolve TCP Commands: ShowTrials and Scoreboard
                     char response_buffer[MAX_FILE_SIZE + HEADER_SIZE];
-               /*      n = write(new_fd,); */
-                    if(n == -1) {
-                        perror("write");
-                        exit(1);
-                    } 
-                    
+                    memset(response_buffer, 0, sizeof(response_buffer));
+                    resolveTCPCommands(request_buffer, response_buffer); 
+
+                    // write to TCP Socket 
+                    ssize_t buffer_length = strlen(response_buffer) + 1;
+                    while(total_bytes < buffer_length) {
+                        ssize_t bytes_sent = write(new_fd, response_buffer + total_bytes, buffer_length);
+                        if(bytes_sent < 0) {
+                            std::cerr << "ERROR: failed while writing to TCP connection\n";
+                            freeaddrinfo(res);
+                            close(new_fd);
+                            exit(1);
+                        }
+                        total_bytes += bytes_sent;
+                    }                                     
                     close(new_fd);
                 }
         }

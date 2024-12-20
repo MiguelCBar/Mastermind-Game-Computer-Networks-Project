@@ -160,6 +160,22 @@ int commandShowTrials(const char* sv_ip, const char* port, const char* plid) {
         }
         total_bytes += bytes_sent;
     }
+/*     close(fd);
+
+    fd = socket(AF_INET, SOCK_STREAM, res->ai_protocol);
+    if (fd == ERROR) {
+        std::cerr << "ERROR: failed to recreate socket.\n";
+        freeaddrinfo(res);
+        return ERROR;
+    }
+
+    n = connect(fd, res->ai_addr, res->ai_addrlen);
+    if (n == ERROR) {
+        std::cerr << "ERROR: failed to reconnect to the server.\n";
+        freeaddrinfo(res);
+        close(fd);
+        return ERROR;
+    } */
 
     /*GET THE RESPONSE FROM THE SERVER*/
     memset(response_buffer, 0, sizeof(response_buffer));
@@ -294,12 +310,11 @@ int commandScoreboard(const char* sv_ip, const char* port) {
     while(true) {
         memset(aux_buffer, 0, sizeof(aux_buffer));
         ssize_t bytes_read = read(fd, aux_buffer, max_size);
-        //printf("aux-buffer: %s\t, bytes_read: %ld\n", aux_buffer, bytes_read);
         if(bytes_read < 0) {
             if (errno == ECONNRESET && response_buffer[total_bytes] == '\n') {
                 break;
             }
-            std::cerr << "ERROR: failed while reading from TCP connection, PRIMEIRO WHILE\n";
+            std::cerr << "ERROR: failed while reading from TCP connection\n";
             freeaddrinfo(res);
             close(fd);
             return ERROR;
