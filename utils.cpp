@@ -39,6 +39,7 @@ bool validColor(const std::string& color) {
 
 void generateColorCode(char* color_code) {
     const char colors[] = "RGBYOP";
+    srand(static_cast<unsigned>(time(0)));
     for (int i = 0; i < 4; i++) {
         color_code[i] = colors[rand() % COLOR_NUMBER];
     }
@@ -118,6 +119,15 @@ void displayColorCode(const char* color_code, char* spaced_color_code) {
     spaced_color_code[j] = '\0';                // Null-terminate the output string
 }
 
+size_t containsChar(const char* buffer, size_t size, char target) {
+    for (size_t i = 0; i < size; ++i) {
+        if (buffer[i] == target) {
+            return (i + 1);
+        }
+    }
+    return 0;
+}
+
 int transcriptOngoingGameFile(const char* file_path, const char* header, char* response_buffer) {
     
     FILE* file;
@@ -156,7 +166,7 @@ int transcriptOngoingGameFile(const char* file_path, const char* header, char* r
 
     offset = 0;
     memset(file_data, 0, sizeof(file_data));
-    offset += sprintf(file_data + offset, "--------------------------------\nActive game found: PLAYER %d\n\n\nGame initiated: %s %s\nTime to complete: %d seconds\n", plid, date, time, gameTime);
+    offset += sprintf(file_data + offset, "--------------------------------\nActive game found: PLAYER %d\n\nGame initiated: %s %s\nTime to complete: %d seconds\n", plid, date, time, gameTime);
     if(trials_count == 0) {
         offset += sprintf(file_data + offset, "\n\tNO TRANSACTIONS FOUND\n");
     }
@@ -199,6 +209,11 @@ int FindLastGame(char *PLID, char *fname) {
     }
 
     return (found);
+}
+
+
+int calculateGameScore(int game_duration, int tries_count) {
+    return int((600 - game_duration) * 50/600 + (8 - tries_count) * 50 / (8-1));
 }
 
     

@@ -1,1 +1,2 @@
 - max_play_time verifciar se é preciso mesmo ter 3 dígitos quando mandas
+- verificar se o plid não vem a null para o server (por exemplo)

@@ -160,22 +160,6 @@ int commandShowTrials(const char* sv_ip, const char* port, const char* plid) {
         }
         total_bytes += bytes_sent;
     }
-/*     close(fd);
-
-    fd = socket(AF_INET, SOCK_STREAM, res->ai_protocol);
-    if (fd == ERROR) {
-        std::cerr << "ERROR: failed to recreate socket.\n";
-        freeaddrinfo(res);
-        return ERROR;
-    }
-
-    n = connect(fd, res->ai_addr, res->ai_addrlen);
-    if (n == ERROR) {
-        std::cerr << "ERROR: failed to reconnect to the server.\n";
-        freeaddrinfo(res);
-        close(fd);
-        return ERROR;
-    } */
 
     /*GET THE RESPONSE FROM THE SERVER*/
     memset(response_buffer, 0, sizeof(response_buffer));
@@ -204,7 +188,7 @@ int commandShowTrials(const char* sv_ip, const char* port, const char* plid) {
     //printf("response buffer: %s\n", response_buffer);
 
     int offset = 0;
-    sscanf(response_buffer, "%s %s %s %ld%n", cmd, status, file_name, &file_size, &offset);
+    sscanf(response_buffer, "%s %s %s %ld %n", cmd, status, file_name, &file_size, &offset);
 
     if(!strcmp(status, "ACT") || !strcmp(status, "FIN")) {
 

@@ -24,6 +24,7 @@ int mode = NOT_VERBOSE;
 int endGame(const char* plid, const char finisher_mode) {
 
     char player_directory[128], file_name[256], time_str[16], file_line[128];
+    char mode, color_code[5];
     time_t fulltime;                                         
 
     // get file name
@@ -43,12 +44,18 @@ int endGame(const char* plid, const char finisher_mode) {
     }
 
     // get game start time
-    int max_game_time;
+    int max_game_time, tries_count = 0;
     time_t start_time;
-    sscanf(file_line + 14, "%03d %*04d-%*02d-%*02d %*02d:%*02d:%*02d %ld", &max_game_time, &start_time);
+    sscanf(file_line + 7, "%c %04s %03d %*10s %*8s %ld", &mode, color_code, &max_game_time, &start_time);
 
     time_t current_time_seconds = time(NULL);
     int game_duration = (int)difftime(current_time_seconds, start_time);
+
+    //get number of trials
+    memset(file_line, 0, sizeof(file_line));
+    while(fgets(file_line, sizeof(file_line), file)) {
+        tries_count++;
+    }
 
     // calculate final game duration
     if(game_duration > max_game_time) {game_duration = max_game_time;}
@@ -63,9 +70,37 @@ int endGame(const char* plid, const char finisher_mode) {
              current_time->tm_year + 1900, current_time->tm_mon + 1, current_time->tm_mday,
              current_time->tm_hour, current_time->tm_min, current_time->tm_sec, game_duration);
 
-    fseek(file, 0, SEEK_END);                           // go to the end of the file
+/*     fseek(file, 0, SEEK_END);  */                          // go to the end of the file
     fwrite(file_line, 1, strlen(file_line), file);      // write last line
     fclose(file);                                       // close file
+
+
+    /*CREATE PLAYER SCORE FILE*/ 
+    if(finisher_mode == WIN) {
+        memset(time_str, 0, sizeof(time_str));
+        sprintf(time_str, "%02d%02d%04d_%02d%02d%02d",
+        current_time->tm_mday, current_time->tm_mon + 1, current_time->tm_year + 1900,
+        current_time->tm_hour, current_time->tm_min, current_time->tm_sec);
+
+        char score_file_name[128];
+        memset(score_file_name, 0, sizeof(score_file_name));
+        int score = calculateGameScore(game_duration, tries_count);
+        sprintf(score_file_name, "SCORES/%03d_%s_%s.txt", score, plid, time_str);
+        file = fopen(score_file_name, "w");
+        if(!file) {
+            return ERROR;   
+        }
+
+        memset(file_line, 0, sizeof(file_line));
+        if(mode == 'P') {
+            sprintf(file_line, "%03d %s %s %d PLAY\n", score, plid, color_code, tries_count);
+        }
+        else {
+            sprintf(file_line, "%03d %s %s %d DEBUG\n", score, plid, color_code, tries_count);  
+            }
+        fwrite(file_line, 1, strlen(file_line), file);
+        fclose(file);
+    }
 
 
     /*CHANGE PLAYER DIRECTORY PATH*/
@@ -344,19 +379,22 @@ int handlerShowTrialsCommand(char* plid, char* response_buffer) {
     }
     memset(file_name, 0, sizeof(file_name));
     sprintf(file_name, "GAMES/GAME_%s.txt", plid);
-    printf("filename: %s\n", file_name);
-    if(getGameHeader(file_name, header)) {
-        transcriptOngoingGameFile(file_name, header, response_buffer);
-        return SUCCESS;
+    if(getGameHeader(file_name, header) != ERROR) {
+        if(!timeExceeded(header)) {
+            transcriptOngoingGameFile(file_name, header, response_buffer);
+            return SUCCESS;
+        }
+        endGame(plid, TIMEOUT);
     }
 
     memset(file_name, 0, sizeof(file_name));
     if(!FindLastGame(plid, file_name)) { //implementação desta função no pdf do stor
         // no game history was found for this player
-        printf("tamale\n");
+        printf("não encontrou nada\n");
         sprintf(response_buffer, "RST NOK\n");
     }
     else {
+        printf("vai procurar no arquivo\n");
         // a finished game was found
         getGameHeader(file_name, header);
         //transcriptFinishedGameFile(file_path, header, response_buffer);
@@ -375,7 +413,16 @@ int resolveUDPCommands(const char* input, char* response_buffer) {
 
     num_args = sscanf(input, "%s %s %s %s %s %s %s\n", cmd, arg1, arg2, arg3, arg4, arg5, arg6);
     switch(num_args) {
-        
+
+/*         case 1:
+            if (!strcmp(cmd, "QUT")) {
+                sprintf(response_buffer, "RQT ERR\n");
+            }
+            else {
+                std::cerr << "Communication error.\n";
+            }
+            break;
+         */
         case 2:
             if (!strcmp(cmd, "QUT")) {
                 handlerQuitCommand(arg1, response_buffer);
@@ -427,12 +474,14 @@ int resolveTCPCommands(const char* input, char* response_buffer) {
     char cmd[32], plid[32];
 
     num_args = sscanf(input, "%s %s\n", cmd, plid);
-
+    printf("num_args: %d",num_args);
     switch(num_args) {
         case 1:
             if(!strcmp(cmd, "SSB"))
                 //handlerScoreboardCommand(response_buffer);
                 ;
+            else if(!strcmp(cmd, "STR"))
+                sprintf(response_buffer, "RST NOK\n");
             else {
                 std::cerr << "ERROR: Communication error.\n";
                 sprintf(response_buffer, "ERR\n");
@@ -591,10 +640,9 @@ int main(int argc, char* argv[]) {
                     memset(request_buffer, 0, sizeof(request_buffer));
 
                     //read from TCP Socket
-                    /* while(true) {
+                    while(true) {
                         memset(aux_buffer, 0, sizeof(aux_buffer));
                         ssize_t bytes_read = read(new_fd, aux_buffer, 128);
-                        printf("aux-buffer: %sbytes_read: %ld\n", aux_buffer, bytes_read);
                         if(bytes_read < 0) {
                             if (errno == ECONNRESET && request_buffer[total_bytes] == '\n') {
                                 break;
@@ -609,19 +657,16 @@ int main(int argc, char* argv[]) {
                         }
                         strcpy(request_buffer + total_bytes, aux_buffer);
                         total_bytes += bytes_read;
-                        printf("ta aqui\n");
-                    } */
-                    printf("saiu bem\n");
-                    memset(aux_buffer, 0, sizeof(aux_buffer));
-                    ssize_t bytes_read = read(new_fd, aux_buffer, 128);
-                    strcpy(request_buffer + total_bytes, aux_buffer);
+                        if(containsChar(request_buffer, strlen(request_buffer), '\n'))
+                            break;
+                    } 
                     // Resolve TCP Commands: ShowTrials and Scoreboard
                     char response_buffer[MAX_FILE_SIZE + HEADER_SIZE];
                     memset(response_buffer, 0, sizeof(response_buffer));
                     resolveTCPCommands(request_buffer, response_buffer); 
-
+                    total_bytes = 0;
                     // write to TCP Socket 
-                    ssize_t buffer_length = strlen(response_buffer) + 1;
+                    ssize_t buffer_length = strlen(response_buffer);
                     while(total_bytes < buffer_length) {
                         ssize_t bytes_sent = write(new_fd, response_buffer + total_bytes, buffer_length);
                         if(bytes_sent < 0) {
@@ -631,7 +676,7 @@ int main(int argc, char* argv[]) {
                             exit(1);
                         }
                         total_bytes += bytes_sent;
-                    }                                     
+                    }                    
                     close(new_fd);
                 }
         }
