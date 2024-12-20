@@ -210,7 +210,6 @@ int handlerStartCommand(const char* plid, const char* max_playtime, const char* 
             }
             endGame(plid, TIMEOUT);
             sprintf(response_buffer + 4, "OK\n");
-            return 0;
         }
     }
 
@@ -390,11 +389,9 @@ int handlerShowTrialsCommand(char* plid, char* response_buffer) {
     memset(file_name, 0, sizeof(file_name));
     if(!FindLastGame(plid, file_name)) { //implementação desta função no pdf do stor
         // no game history was found for this player
-        printf("não encontrou nada\n");
         sprintf(response_buffer, "RST NOK\n");
     }
     else {
-        printf("vai procurar no arquivo\n");
         // a finished game was found
         getGameHeader(file_name, header);
         //transcriptFinishedGameFile(file_path, header, response_buffer);
