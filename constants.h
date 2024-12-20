@@ -33,4 +33,7 @@ const char FAIL = 'F';
 const char QUIT = 'Q';
 const char TIMEOUT = 'T';
 
+const int RESEND_TIMEOUT = 2;
+const int RESEND_TRIES = 3;
+
 #endif

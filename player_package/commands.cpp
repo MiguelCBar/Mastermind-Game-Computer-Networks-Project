@@ -48,7 +48,7 @@ int commandEndGame(const char* sv_ip, const char* port, const char* plid) {
     memset(request_buffer, 0, sizeof(request_buffer));
     sprintf(request_buffer, "QUT %s\n", plid);
 
-    while (retries < 3) {
+    while (retries < RESEND_TRIES) {
         // Enviar a mensagem para o servidor
         n = sendto(fd, request_buffer, strlen(request_buffer), 0, res->ai_addr, res->ai_addrlen);
         if (n == ERROR) {
@@ -62,7 +62,7 @@ int commandEndGame(const char* sv_ip, const char* port, const char* plid) {
         FD_ZERO(&readfds);
         FD_SET(fd, &readfds);
 
-        timeout.tv_sec = 2;     // 2 second timeout
+        timeout.tv_sec = RESEND_TIMEOUT;     // 2 second timeout
         timeout.tv_usec = 0;
 
         int activity = select(fd + 1, &readfds, nullptr, nullptr, &timeout);
@@ -74,13 +74,11 @@ int commandEndGame(const char* sv_ip, const char* port, const char* plid) {
             return ERROR;
         }
         else if (activity == 0) {
-            // Timeout ocorreu
             retries++;
-            std::cerr << "WARNING: Timeout! Attempt " << retries << " of 3\n";
-            continue; // Tentar novamente
+            std::cerr << "WARNING: Timeout! Attempt " << retries << " of " << RESEND_TRIES << "\n";
+            continue;
         }
         else {
-            // Dados recebidos
             if (FD_ISSET(fd, &readfds)) {
                 addrlen = sizeof(addr);
                 memset(response_buffer, 0, sizeof(response_buffer));
@@ -228,7 +226,7 @@ int commandShowTrials(const char* sv_ip, const char* port, const char* plid) {
     }
     else if(!strcmp(status, "ACT") || !strcmp(status, "FIN")) {
 
-        char file_path[128];
+        char file_path[256];
         // verify if args are correct
         if(strlen(file_name) > 24) {
             std::cerr << "ERROR: Fname cannot be bigger than 24B\n";
@@ -445,7 +443,7 @@ int commandStartGame(const char* sv_ip, const char* port, const char* plid, cons
 
 
     // Receive response with retries and timeout
-    while (retries < 3) {
+    while (retries < RESEND_TRIES) {
         // Send request to server
         n = sendto(fd, request_buffer, strlen(request_buffer), 0, res->ai_addr, res->ai_addrlen);
         if (n == ERROR) {
@@ -457,7 +455,7 @@ int commandStartGame(const char* sv_ip, const char* port, const char* plid, cons
         FD_ZERO(&readfds);
         FD_SET(fd, &readfds);
 
-        timeout.tv_sec = 2;     // 2 second timeout
+        timeout.tv_sec = RESEND_TIMEOUT;     // 2 second timeout
         timeout.tv_usec = 0;
 
         int activity = select(fd + 1, &readfds, nullptr, nullptr, &timeout);
@@ -470,7 +468,7 @@ int commandStartGame(const char* sv_ip, const char* port, const char* plid, cons
         } else if (activity == 0) {
             // Timeout occurred
             retries++;
-            std::cerr << "WARNING: Timeout! Attempt " << retries << " of 3\n";
+            std::cerr << "WARNING: Timeout! Attempt " << retries << " of " << RESEND_TRIES << "\n";
             continue; // Retry
         } else {
             // Data received
@@ -490,7 +488,7 @@ int commandStartGame(const char* sv_ip, const char* port, const char* plid, cons
     }
 
     // If all retries failed
-    if (retries == 3) {
+    if (retries == RESEND_TRIES) {
         std::cerr << "ERROR: Connection failed after 3 attempts. Terminating.\n";
         freeaddrinfo(res);
         close(fd);
@@ -578,7 +576,7 @@ int commandTry(const char* sv_ip, const char* port, const char* c1, const char* 
     sprintf(request_buffer, "TRY %s %s %s %s %s %d\n", plid, c1, c2, c3, c4, *nT);
 
     // Receive response with retries and timeout
-    while (retries < 3) {
+    while (retries < RESEND_TRIES) {
 
         // Send request to server
         n = sendto(fd, request_buffer, strlen(request_buffer), 0, res->ai_addr, res->ai_addrlen);
@@ -591,7 +589,7 @@ int commandTry(const char* sv_ip, const char* port, const char* c1, const char* 
         FD_ZERO(&readfds);
         FD_SET(fd, &readfds);
 
-        timeout.tv_sec = 2;     // 2 second timeout
+        timeout.tv_sec = RESEND_TIMEOUT;     // 2 second timeout
         timeout.tv_usec = 0;
 
         int activity = select(fd + 1, &readfds, nullptr, nullptr, &timeout);
@@ -604,7 +602,7 @@ int commandTry(const char* sv_ip, const char* port, const char* c1, const char* 
         } else if (activity == 0) {
             // Timeout occurred
             retries++;
-            std::cerr << "WARNING: Timeout! Attempt " << retries << " of 3\n";
+            std::cerr << "WARNING: Timeout! Attempt " << retries << " of " << RESEND_TRIES << "\n";
             continue; // Retry
         } else {
             // Data received
@@ -624,7 +622,7 @@ int commandTry(const char* sv_ip, const char* port, const char* c1, const char* 
     }
 
     // If all retries failed
-    if (retries == 3) {
+    if (retries == RESEND_TRIES) {
         std::cerr << "ERROR: Connection failed after 3 attempts. Terminating.\n";
         freeaddrinfo(res);
         close(fd);
@@ -753,7 +751,7 @@ int commandDebug(const char* sv_ip, const char* port, const char* plid, const ch
     sprintf(request_buffer, "DBG %s %s %s %s %s %s\n", plid, max_playtime, c1, c2, c3, c4);
 
     // Loop de retries com timeout
-    while (retries < 3) {
+    while (retries < RESEND_TRIES) {
         // Send message to server
         n = sendto(fd, request_buffer, strlen(request_buffer), 0, res->ai_addr, res->ai_addrlen);
         if (n == ERROR) {
@@ -765,7 +763,7 @@ int commandDebug(const char* sv_ip, const char* port, const char* plid, const ch
         FD_ZERO(&readfds);
         FD_SET(fd, &readfds);
 
-        timeout.tv_sec = 2; // Timeout de 2 segundos
+        timeout.tv_sec = RESEND_TIMEOUT;    // Timeout de 2 segundos
         timeout.tv_usec = 0;
 
         int activity = select(fd + 1, &readfds, nullptr, nullptr, &timeout);
@@ -776,12 +774,10 @@ int commandDebug(const char* sv_ip, const char* port, const char* plid, const ch
             close(fd);
             return ERROR;
         } else if (activity == 0) {
-            // Timeout ocorreu
             retries++;
-            std::cerr << "WARNING: Timeout! Attempt " << retries << " of 3\n";
-            continue; // Retry
+            std::cerr << "WARNING: Timeout! Attempt " << retries << " of " << RESEND_TRIES << "\n";
+            continue;
         } else {
-            // Dados recebidos
             if (FD_ISSET(fd, &readfds)) {
                 addrlen = sizeof(addr);
                 memset(response_buffer, 0, sizeof(response_buffer));
@@ -798,7 +794,7 @@ int commandDebug(const char* sv_ip, const char* port, const char* plid, const ch
     }
 
     // Caso todas as tentativas falhem
-    if (retries == 3) {
+    if (retries == RESEND_TRIES) {
         std::cerr << "ERROR: Connection failed after 3 attempts. Terminating.\n";
         freeaddrinfo(res);
         close(fd);

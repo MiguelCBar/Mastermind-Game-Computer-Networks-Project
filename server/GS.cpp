@@ -13,6 +13,7 @@
 #include <ctime>
 #include <iomanip>
 
+#include "GS.h"
 #include "../utils.h"
 #include "../constants.h"
 
@@ -24,7 +25,7 @@ int server_mode = NOT_VERBOSE;
 
 int endGame(const char* plid, const char finisher_mode) {
 
-    char player_directory[128], file_name[256], time_str[64], file_line[128];
+    char player_directory[128], file_name[MAX_FILE_NAME], time_str[64], file_line[128];
     char game_mode, color_code[5];
     time_t fulltime;                                         
 
@@ -123,7 +124,7 @@ int endGame(const char* plid, const char finisher_mode) {
              current_time->tm_hour, current_time->tm_min, current_time->tm_sec);
 
     // define new path of the file
-    char new_file_name[256];
+    char new_file_name[MAX_FILE_NAME * 2];
     memset(new_file_name, 0, sizeof(new_file_name));
     sprintf(new_file_name, "%s%s_%c.txt", player_directory, time_str, finisher_mode);
     fs::path new_path = new_file_name;
@@ -173,7 +174,7 @@ int handlerStartCommand(const char* plid, const char* max_playtime, const char* 
 
     time_t fulltime;                                         
     struct tm* currentTime;
-    char file_line[128], file_name[64], time_str[20], header[HEADER_SIZE];
+    char file_line[128], file_name[64], time_str[64], header[HEADER_SIZE];
     char color_code[5]; // 4 chars + null terminator
     
     if(!strcmp(game_mode, "P")) {
@@ -409,9 +410,9 @@ int handlerShowTrialsCommand(char* plid, char* response_buffer) {
 int handlerScoreboardCommand(char* response_buffer) {
 
     const char* directory = "SCORES";
-    char file_data[MAX_FILE_SIZE];
+    char file_data[MAX_FILE_SIZE/2];
 
-    memset(file_data, 0, MAX_FILE_SIZE);
+    memset(file_data, 0, MAX_FILE_SIZE/2);
     int status = processScores(directory, file_data);
 
     if (status == EMPTY){
@@ -559,11 +560,11 @@ int main(int argc, char* argv[]) {
     }
     // Criar socket UDP
     udp_socket = socket(AF_INET, SOCK_DGRAM, 0);
-    if (udp_socket == -1) {
+    if (udp_socket == ERROR) {
         exit(1);
     }
     tcp_socket = socket(AF_INET, SOCK_STREAM, 0);
-    if(tcp_socket == -1) {
+    if(tcp_socket == ERROR) {
         exit(1);
     }
     // Configuração dos hints
@@ -588,7 +589,7 @@ int main(int argc, char* argv[]) {
 
     for (p = res; p != NULL; p = p->ai_next) {
         if(p->ai_socktype == SOCK_DGRAM) {
-            if(bind(udp_socket, p->ai_addr, p->ai_addrlen) == -1) {
+            if(bind(udp_socket, p->ai_addr, p->ai_addrlen) == ERROR) {
                 perror("UDP Socket bind error");
                 close(udp_socket);
                 close(tcp_socket);
@@ -596,13 +597,13 @@ int main(int argc, char* argv[]) {
             }
         }
         else if(p->ai_socktype == SOCK_STREAM) {
-            if(bind(tcp_socket, p->ai_addr, p->ai_addrlen) == -1) {
+            if(bind(tcp_socket, p->ai_addr, p->ai_addrlen) == ERROR) {
                 perror("TCP Socket bind error");
                 close(udp_socket);
                 close(tcp_socket);
                 exit(1);
             }
-            if(listen(tcp_socket, 5) == -1) {
+            if(listen(tcp_socket, 5) == ERROR) {
                 perror("Error while trying to listen to TCP Socket");
                 close(udp_socket);
                 close(tcp_socket);
@@ -623,7 +624,6 @@ int main(int argc, char* argv[]) {
         out_fds = select(FD_SETSIZE, &test_fd_sockets, (fd_set*) NULL, (fd_set*)NULL, NULL);
         switch(out_fds) {
             case ERROR:
-                perror("Error in Select function");
                 exit(1);
             case 0:
                 break;
@@ -633,8 +633,7 @@ int main(int argc, char* argv[]) {
                 if (FD_ISSET(udp_socket, &test_fd_sockets)) {
                     memset(request_buffer, 0, sizeof(request_buffer));
                     n = recvfrom(udp_socket, request_buffer, sizeof(request_buffer), 0, (struct sockaddr*)&addr, &addrlen);
-                    if (n == -1) {
-                        perror("recvfrom");
+                    if (n == ERROR) {
                         exit(1);
                     }
                     if (server_mode == VERBOSE) {
@@ -658,12 +657,11 @@ int main(int argc, char* argv[]) {
                 }
                 else if (FD_ISSET(tcp_socket, &test_fd_sockets)) {
                     int new_fd = accept(tcp_socket, (struct sockaddr*)&addr, &addrlen);
-                    if (new_fd == -1) {
-                        perror("TCP Socket accept error");
+                    if (new_fd == ERROR) {
                         exit(1);
                     }
                     pid_t pid = fork();
-                    if (pid == -1) {
+                    if (pid == ERROR) {
                         close(new_fd);
                         exit(1);
                     }
@@ -681,7 +679,6 @@ int main(int argc, char* argv[]) {
                                 if (errno == ECONNRESET && request_buffer[total_bytes] == '\n') {
                                     break;
                                 }
-                                std::cerr << "ERROR: failed while reading from TCP connection\n";
                                 freeaddrinfo(res);
                                 close(new_fd);
                                 exit(1);

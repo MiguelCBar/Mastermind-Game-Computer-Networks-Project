@@ -289,21 +289,20 @@ int processScores(const char* directory, char* file_data) {
     struct dirent* entry;
     FileInfo topFiles[10] = {};
 
-    // Abrir a diretoria
-
+    // Open directory
     dir = opendir(directory);
     if (!dir) {
         return ERROR;
     }
 
-    // Iterar pelos ficheiros na diretoria
+    // Iterate the files
     while ((entry = readdir(dir)) != nullptr) {
         
         char* filename = entry->d_name;
         // Extract score
         int score = atoi(filename);
 
-        char filepath[MAX_FILE_NAME];
+        char filepath[MAX_FILE_NAME * 4];
         snprintf(filepath, sizeof(filepath), "%s/%s", directory, filename);
 
         // Verify if game should be on the Top 10 Scores
@@ -320,9 +319,7 @@ int processScores(const char* directory, char* file_data) {
             }
         }
     }
-
     closedir(dir);
-
     // Read and copy to buffer the top 10 best scores
     char line[128], transformed_line[128];
     int offset = 0;
