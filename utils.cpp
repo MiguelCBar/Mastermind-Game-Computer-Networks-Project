@@ -49,21 +49,6 @@ void generateColorCode(char* color_code) {
     color_code[4] = '\0'; // Add the '\0' character
 }
 
-/* bool gameOn(const char* plid) {
-
-        char file_name[64];
-        sprintf(file_name, "GAMES/GAME_%s.txt", plid);
-        FILE* file = fopen(file_name, "r"); // Opens the file in read mode
-
-        if (file) {
-            fclose(file); // Closes file
-            return true;  // File exists --> Game exists
-        } else {
-            return false; // O ficheiro não existe
-        }
-} */
-
-
 int getTimePassed(const char* header) {
 
     int max_game_time, game_duration;
@@ -71,7 +56,7 @@ int getTimePassed(const char* header) {
     sscanf(header + 14, "%03d %*04d-%*02d-%*02d %*02d:%*02d:%*02d %ld", &max_game_time, &start_time);
 
     time_t current_time = time(NULL);
-    game_duration = (int)difftime(current_time, start_time); // VERIFICAR SE É PRECISO PASSAR O START TIME PARA TIME PORQUE FOI LIDO COM %ld
+    game_duration = (int)difftime(current_time, start_time);
 
     if (max_game_time < game_duration) {
         game_duration = max_game_time;
@@ -99,7 +84,6 @@ int getGameHeader(const char* file_name, char* header) {
     if(!file) {return ERROR;}
 
     if(fgets(header, HEADER_SIZE, file) == NULL) {
-        printf("entrou mal\n");
         return ERROR;}
     fclose(file);
 
@@ -213,7 +197,6 @@ int transcriptFinishedGameFile(const char* file_path, const char* header, char* 
     memset(line, 0, sizeof(line));
     memset(file_tries_data, 0, sizeof(file_tries_data));
     while(fgets(line, HEADER_SIZE, file)) {
-        printf("char: %c\n", line[0]);
         if (line[0] == 'T') {
             sscanf(line, "T: %4s %d %d %d", color_code, &nB, &nW, &try_time);
             offset += sprintf(file_tries_data + offset, "Trial: %s, nB: %d\tnW: %d at %d sec\n", color_code, nB, nW, try_time);
@@ -300,8 +283,6 @@ int FindLastGame(char *PLID, char *fname) {
     return (found);
 }
 
-
-
 int processScores(const char* directory, char* file_data) {
     
     DIR* dir;
@@ -312,7 +293,6 @@ int processScores(const char* directory, char* file_data) {
 
     dir = opendir(directory);
     if (!dir) {
-        std::cerr << "ERROR: failed to open directory\n";
         return ERROR;
     }
 
@@ -371,8 +351,7 @@ int processScores(const char* directory, char* file_data) {
         }
         fclose(input);
     }
-    
-    std::cout << "acabou de processar o buffer\n\n";
+
 
     return SUCCESS;
 

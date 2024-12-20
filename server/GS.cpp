@@ -17,14 +17,15 @@
 #include "../constants.h"
 
 
-int mode = NOT_VERBOSE;
+int server_mode = NOT_VERBOSE;
+
 
 //provavelmente, falta mais close(tcp_socket) e close(udp_socket), nos erros
 
 int endGame(const char* plid, const char finisher_mode) {
 
-    char player_directory[128], file_name[256], time_str[16], file_line[128];
-    char mode, color_code[5];
+    char player_directory[128], file_name[256], time_str[64], file_line[128];
+    char game_mode, color_code[5];
     time_t fulltime;                                         
 
     // get file name
@@ -46,7 +47,7 @@ int endGame(const char* plid, const char finisher_mode) {
     // get game start time
     int max_game_time, tries_count = 0;
     time_t start_time;
-    sscanf(file_line + 7, "%c %04s %03d %*10s %*8s %ld", &mode, color_code, &max_game_time, &start_time);
+    sscanf(file_line + 7, "%c %04s %03d %*10s %*8s %ld", &game_mode, color_code, &max_game_time, &start_time);
 
     time_t current_time_seconds = time(NULL);
     int game_duration = (int)difftime(current_time_seconds, start_time);
@@ -92,7 +93,7 @@ int endGame(const char* plid, const char finisher_mode) {
         }
 
         memset(file_line, 0, sizeof(file_line));
-        if(mode == 'P') {
+        if(game_mode == 'P') {
             sprintf(file_line, "%03d %s %s %d PLAY\n", score, plid, color_code, tries_count);
         }
         else {
@@ -168,14 +169,14 @@ int handlerQuitCommand(const char* plid, char* response_buffer) {
 
 
 
-int handlerStartCommand(const char* plid, const char* max_playtime, const char* mode, const char* c1, const char* c2, const char* c3, const char* c4, char* response_buffer) {
+int handlerStartCommand(const char* plid, const char* max_playtime, const char* game_mode, const char* c1, const char* c2, const char* c3, const char* c4, char* response_buffer) {
 
     time_t fulltime;                                         
     struct tm* currentTime;
     char file_line[128], file_name[64], time_str[20], header[HEADER_SIZE];
     char color_code[5]; // 4 chars + null terminator
     
-    if(!strcmp(mode, "P")) {
+    if(!strcmp(game_mode, "P")) {
         sprintf(response_buffer, "RSG ");      // normal game mode
     } else {
         sprintf(response_buffer, "RDB ");      // debug game mode
@@ -184,7 +185,7 @@ int handlerStartCommand(const char* plid, const char* max_playtime, const char* 
         sprintf(response_buffer + 4, "ERR\n");
         return ERROR;
     }
-    if(!strcmp(mode, "D") && (!validColor(c1) || !validColor(c2) || !validColor(c3) || !validColor(c4))) {
+    if(!strcmp(game_mode, "D") && (!validColor(c1) || !validColor(c2) || !validColor(c3) || !validColor(c4))) {
         sprintf(response_buffer + 4, "ERR\n");
         return ERROR;
     }
@@ -200,7 +201,6 @@ int handlerStartCommand(const char* plid, const char* max_playtime, const char* 
         memset(file_line, 0, sizeof(file_line));
         fgets(file_line, sizeof(file_line), file);
         fclose(file);
-        printf("file_line: %s\n", file_line);
         // checks if the game already has tries
         if (strcmp(file_line, "")) {
             getGameHeader(file_name, header);
@@ -214,7 +214,7 @@ int handlerStartCommand(const char* plid, const char* max_playtime, const char* 
     }
 
     memset(color_code, 0, sizeof(color_code));      // clear color_code
-    if (!strcmp(mode, "P")) {                       // normal game
+    if (!strcmp(game_mode, "P")) {                       // normal game
         generateColorCode(color_code);              // generates the color code
     }
     else {  // debug mode --> use color code requested by user
@@ -237,7 +237,7 @@ int handlerStartCommand(const char* plid, const char* max_playtime, const char* 
     // create first line of the file
     char first_file_line[128];
     memset(first_file_line, 0, sizeof(first_file_line));
-    sprintf(first_file_line, "%s %s %s %s %s %ld", plid, mode, color_code, max_playtime, time_str, initialTime);
+    sprintf(first_file_line, "%s %s %s %s %s %ld", plid, game_mode, color_code, max_playtime, time_str, initialTime);
     fprintf(file, "%s\n", first_file_line); // write first line to the file
 
     sprintf(response_buffer + 4, "OK\n");
@@ -269,10 +269,6 @@ int makeNewTrial (const char* file_name, const char* header, const char* color_c
             for(int j = 0; j < 4; j++) {
                 if (i != j && !matching_key[j] && guess[i] == color_code[j]) {
                     (*nW)++;
-                    std::cout << "guess"<< guess[i] << "->> ind: "<< i << "\n";
-                    std::cout << "key"<< color_code[j] << "->> ind: "<< j << "\n";
-                    //printf("guess:%s ->> ind: %d", guess[i], i);
-                    //printf("key:%s ->> ind: %d", color_code[j], j);
                     matching_guess[i] = true;
                     matching_key[j] = true;
                     break;
@@ -364,7 +360,6 @@ int handlerTryCommand(const char* plid, const char* c1, const char* c2, const ch
 
     int nB = 0, nW = 0;
     int game_state = makeNewTrial(file_name, header, color_code, new_guess, trials + 1, &nB, &nW);
-    printf("game state: %d", game_state);
     if (game_state == GAME_WON) {        // game won
         endGame(plid, 'W');
         sprintf(response_buffer, "RTR OK %s %d %d\n", new_trial_number, nB, nW);  // create OK response to player
@@ -416,12 +411,8 @@ int handlerScoreboardCommand(char* response_buffer) {
     const char* directory = "SCORES";
     char file_data[MAX_FILE_SIZE];
 
-    std::cout << "antes do processScores " << std::endl;
-
     memset(file_data, 0, MAX_FILE_SIZE);
     int status = processScores(directory, file_data);
-
-    std::cout << "saiu do processScores\t\tstatus:" << status << std::endl;
 
     if (status == EMPTY){
         sprintf(response_buffer, "RSS EMPTY\n");
@@ -444,23 +435,13 @@ int resolveUDPCommands(const char* input, char* response_buffer) {
 
     num_args = sscanf(input, "%s %s %s %s %s %s %s\n", cmd, arg1, arg2, arg3, arg4, arg5, arg6);
     switch(num_args) {
-
-/*         case 1:
-            if (!strcmp(cmd, "QUT")) {
-                sprintf(response_buffer, "RQT ERR\n");
-            }
-            else {
-                std::cerr << "Communication error.\n";
-            }
-            break;
-         */
         case 2:
             if (!strcmp(cmd, "QUT")) {
                 handlerQuitCommand(arg1, response_buffer);
 
             }
             else {
-                std::cerr << "Communication error.\n";
+                return ERROR;
             }
             break;
             
@@ -471,7 +452,7 @@ int resolveUDPCommands(const char* input, char* response_buffer) {
                 }
             }
             else {
-                std::cerr << "ERROR: Communication error.\n";
+                return ERROR;
             }
             break;
 
@@ -487,13 +468,12 @@ int resolveUDPCommands(const char* input, char* response_buffer) {
                 }
             }
             else {
-                std::cerr << "ERROR: Communication error.\n";
+                return ERROR;
             }
             break; 
         default:
-            std::cerr << "ERROR: Communication error.\n";
             sprintf(response_buffer, "ERR\n");
-            break;
+            return ERROR;
 
     }
     return SUCCESS;
@@ -505,17 +485,13 @@ int resolveTCPCommands(const char* input, char* response_buffer) {
     char cmd[32], plid[32];
 
     num_args = sscanf(input, "%s %s\n", cmd, plid);
-    printf("num_args: %d",num_args);
     switch(num_args) {
         case 1:
             if(!strcmp(cmd, "SSB")) {
                 handlerScoreboardCommand(response_buffer);
-            }       
-            else if(!strcmp(cmd, "STR"))
-                sprintf(response_buffer, "RST NOK\n");
-            else {
-                std::cerr << "ERROR: Communication error.\n";
+            } else {
                 sprintf(response_buffer, "ERR\n");
+                return ERROR;
             }
             break;
             
@@ -523,14 +499,13 @@ int resolveTCPCommands(const char* input, char* response_buffer) {
             if(!strcmp(cmd, "STR"))
                 handlerShowTrialsCommand(plid, response_buffer);
             else {
-                std::cerr << "ERROR: Communication error.\n";
                 sprintf(response_buffer, "ERR\n");
+                return ERROR;
             }
             break;  
         default:
-            std::cerr << "ERROR: Communication error.\n";
             sprintf(response_buffer, "ERR\n");
-            break;
+            return ERROR;
     }
     return SUCCESS;
 }
@@ -548,39 +523,59 @@ int main(int argc, char* argv[]) {
     int out_fds;
     struct timeval timeout;
     fd_set fd_sockets;
-
-    if (argc > 1 && argv[1] != NULL) {
-        port = argv[1];
-    } else {
-        port = PORT;
+    switch(argc) {
+        case 1:
+            port = PORT;
+            break;
+        case 2:
+            if(std::string(argv[1]) == "-v") {
+                port = PORT;
+                server_mode = VERBOSE;
+            } else {
+                std::cerr << "ERROR: failed to write arguments, the correct structure is as follows: ./GS [-p GSport] [-v]\n";
+                exit(1);
+            }
+            break;
+        case 3:
+            if(std::string(argv[1]) == "-p") {
+                port = argv[2];
+            } else {
+                std::cerr << "ERROR: failed to write arguments, the correct structure is as follows: ./GS [-p GSport] [-v]\n";
+                exit(1);
+            }
+            break;
+        case 4:
+            if(std::string(argv[1]) == "-p" && std::string(argv[3]) == "-v") {
+                port = argv[2];
+                server_mode = VERBOSE;
+            } else {
+                std::cerr << "ERROR: failed to write arguments, the correct structure is as follows: ./GS [-p GSport] [-v]\n";
+                exit(1);
+            }
+            break;
+        default:
+            std::cerr << "ERROR: failed to write arguments, the correct structure is as follows: ./GS [-p GSport] [-v]\n";
+            exit(1);
     }
-    if (argc > 2 && argv[2] != NULL) {
-        mode = VERBOSE;
-    }
-
     // Criar socket UDP
     udp_socket = socket(AF_INET, SOCK_DGRAM, 0);
     if (udp_socket == -1) {
-        perror("Error in creating UDP Socket");
         exit(1);
     }
-
     tcp_socket = socket(AF_INET, SOCK_STREAM, 0);
     if(tcp_socket == -1) {
-        perror("Error in creating TCP Socket");
         exit(1);
     }
-
     // Configuração dos hints
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;       // IPv4
     hints.ai_socktype = 0; // Socket UDP
     hints.ai_flags = AI_PASSIVE;    // Aceitar conexões
 
+    
     // Obter informações do endereço
     int errcode = getaddrinfo(NULL, port, &hints, &res);
     if (errcode != 0) {
-        std::cerr << "Getaddrinfo: " << gai_strerror(errcode) << std::endl;
         exit(1);
     }
 
@@ -635,53 +630,54 @@ int main(int argc, char* argv[]) {
             default:
                 addrlen = sizeof(addr);
                 char request_buffer[128];
-                if(FD_ISSET(udp_socket, &test_fd_sockets)) {
+                if (FD_ISSET(udp_socket, &test_fd_sockets)) {
                     memset(request_buffer, 0, sizeof(request_buffer));
                     n = recvfrom(udp_socket, request_buffer, sizeof(request_buffer), 0, (struct sockaddr*)&addr, &addrlen);
                     if (n == -1) {
                         perror("recvfrom");
                         exit(1);
                     }
-                    // Exibir a mensagem recebida
-                    write(1, "received: ", 10);
-                    write(1, request_buffer, n);
+                    if (server_mode == VERBOSE) {
+                        // Get player id and port
+                        char client_ip[INET_ADDRSTRLEN];
+                        inet_ntop(AF_INET, &addr.sin_addr, client_ip, INET_ADDRSTRLEN);
+                        int client_port = ntohs(addr.sin_port);
+
+                        // Show request from player
+                        std::cout << "client IP: " << client_ip << "\tclient port: " <<client_port << "\nrequest: " << request_buffer << "\n";
+                    }
 
                     char response_buffer[128];
                     memset(response_buffer, 0, sizeof(response_buffer));
                     resolveUDPCommands(request_buffer, response_buffer);
-                    
-                    printf("response_buffer: %s\n", response_buffer);
+
                     // Enviar resposta para o cliente
                     if (sendto(udp_socket, response_buffer, strlen(response_buffer), 0, (struct sockaddr*)&addr, addrlen) == ERROR) {
-                        std::cerr << "ERROR: Failed to send message through UDP protocol.\n";
                         exit(1);
                     }
                 }
-
-                else if(FD_ISSET(tcp_socket, &test_fd_sockets)) {
-                    int new_fd = accept(tcp_socket, (struct sockaddr*) &addr, &addrlen);
-                    if(new_fd == -1) {
+                else if (FD_ISSET(tcp_socket, &test_fd_sockets)) {
+                    int new_fd = accept(tcp_socket, (struct sockaddr*)&addr, &addrlen);
+                    if (new_fd == -1) {
                         perror("TCP Socket accept error");
                         exit(1);
                     }
                     pid_t pid = fork();
-                    if(pid == -1) {
-                        std::cerr << "ERROR: failed to fork while trying to create child process.\n";
+                    if (pid == -1) {
                         close(new_fd);
                         exit(1);
                     }
 
-                    if(pid == 0) {
-
+                    if (pid == 0) { // Processo filho
                         ssize_t total_bytes = 0;
                         char aux_buffer[128];
                         memset(request_buffer, 0, sizeof(request_buffer));
 
-                        //read from TCP Socket
-                        while(true) {
+                        // Ler do socket TCP
+                        while (true) {
                             memset(aux_buffer, 0, sizeof(aux_buffer));
-                            ssize_t bytes_read = read(new_fd, aux_buffer, 128);
-                            if(bytes_read < 0) {
+                            ssize_t bytes_read = read(new_fd, aux_buffer, sizeof(aux_buffer));
+                            if (bytes_read < 0) {
                                 if (errno == ECONNRESET && request_buffer[total_bytes] == '\n') {
                                     break;
                                 }
@@ -690,85 +686,52 @@ int main(int argc, char* argv[]) {
                                 close(new_fd);
                                 exit(1);
                             }
-                            if(bytes_read == 0) {
+                            if (bytes_read == 0) {
                                 break;
                             }
                             strcpy(request_buffer + total_bytes, aux_buffer);
                             total_bytes += bytes_read;
-                            if(containsChar(request_buffer, strlen(request_buffer), '\n'))
+                            if (containsChar(request_buffer, strlen(request_buffer), '\n'))
                                 break;
-                        } 
-                        printf("request: %s\n", request_buffer);
+                        }
+                        if (server_mode == VERBOSE) {
+                            // Get player id and port
+                            char client_ip[INET_ADDRSTRLEN];
+                            inet_ntop(AF_INET, &addr.sin_addr, client_ip, INET_ADDRSTRLEN);
+                            int client_port = ntohs(addr.sin_port);
 
-                        // Resolve TCP Commands: ShowTrials and Scoreboard
+                            // Show request from player
+                            std::cout << "client IP: " << client_ip << "\tclient port: " <<client_port << "\nrequest: " << request_buffer << "\n";
+                        }
+
+                        // Resolver comandos TCP
                         char response_buffer[MAX_FILE_SIZE + HEADER_SIZE];
                         memset(response_buffer, 0, sizeof(response_buffer));
-                        resolveTCPCommands(request_buffer, response_buffer); 
+                        resolveTCPCommands(request_buffer, response_buffer);
+
+                        // Enviar resposta ao cliente
                         total_bytes = 0;
-                        // write to TCP Socket 
                         ssize_t buffer_length = strlen(response_buffer);
-                        while(total_bytes < buffer_length) {
+                        while (total_bytes < buffer_length) {
                             ssize_t bytes_sent = write(new_fd, response_buffer + total_bytes, buffer_length);
-                            if(bytes_sent < 0) {
-                                std::cerr << "ERROR: failed while writing to TCP connection\n";
+                            if (bytes_sent < 0) {
                                 freeaddrinfo(res);
                                 close(new_fd);
                                 exit(1);
                             }
                             total_bytes += bytes_sent;
-                        }         
-                        printf("response: %s\n", response_buffer);           
+                        }
                         close(new_fd);
-                    } else {
+                    } else { // Father process
                         close(new_fd);
                     }
                 }
+                break;
         }
 
     }
     freeaddrinfo(res);
     close(udp_socket);
     close(tcp_socket);
-
-    return 0;
-
-}
-
-
-
-    /* // Associar socket ao endereço
-    if (bind(udp_socket, res_udp_socket->ai_addr, res_tcp_socket->ai_addrlen) == -1) {
-        perror("bind");
-        exit(1);
-    }
-
-    while (true) {
-        addrlen = sizeof(addr);
-        // Esperar por um datagrama
-        n = recvfrom(udp_socket, buffer, sizeof(buffer), 0, (struct sockaddr*)&addr, &addrlen);
-        if (n == -1) {
-            perror("recvfrom");
-            exit(1);
-        }
-
-        // Exibir a mensagem recebida
-        write(1, "received: ", 10);
-        write(1, buffer, n);
-
-        // Enviar resposta para o cliente
-        if (sendto(udp_socket, buffer, n, 0, (struct sockaddr*)&addr, addrlen) == -1) {
-            perror("sendto");
-            exit(1);
-        }
-    }
-
-    // Limpar recursos
-    freeaddrinfo(res);
-    close(udp_socket);
-
     return 0;
 }
- */
-
-
-// TESTE ---------

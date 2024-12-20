@@ -2,6 +2,6 @@
 - verificar se o plid não vem a null para o server (por exemplo)
 
 - timeout no player (resend)
-- fork no server (tcp)
+- fork no server (tcp)    ---------------- done----------------
 - signals
 - verbose

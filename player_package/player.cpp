@@ -62,6 +62,9 @@ int main(int argc, char* argv[]) {
                             active_game = false;
                             nT = 1;
                         }
+                        else {
+                            exit(1);
+                        }
                     }
                     else {
                         std::cout << "You do not have an ongoing game\n";
