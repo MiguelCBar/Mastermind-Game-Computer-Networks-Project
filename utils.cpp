@@ -176,9 +176,9 @@ int transcriptOngoingGameFile(const char* file_path, const char* header, char* r
     else {
         offset += sprintf(file_data + offset, "\n\tTRANSACTIONS FOUND: %d\n\n", trials_count);
     }
-    offset += sprintf(file_data + offset, "%s\n\n\tREMAINING TIME LEFT: %d\n--------------------------------\n", file_tries_data, time_left);
+    offset += sprintf(file_data + offset, "%s\n\n\tREMAINING TIME LEFT: %d\n--------------------------------", file_tries_data, time_left);
 
-    sprintf(response_buffer, "RST ACT %s %ld %s", file_name, strlen(file_data), file_data);
+    sprintf(response_buffer, "RST ACT %s %ld %s\n", file_name, strlen(file_data), file_data);
 
     return SUCCESS;
 }
@@ -262,8 +262,8 @@ int transcriptFinishedGameFile(const char* file_path, const char* header, char* 
     else if(finisher_mode == 'F')
         offset += sprintf(file_data + offset, "Termination: FAIL ");
 
-    offset += sprintf(file_data + offset, "at %s %s\nGame Duration: %d seconds\n--------------------------------\n", final_date, final_time, game_duration);
-    sprintf(response_buffer, "RST FIN %s %ld %s", file_name, strlen(file_data), file_data);
+    offset += sprintf(file_data + offset, "at %s %s\nGame Duration: %d seconds\n--------------------------------", final_date, final_time, game_duration);
+    sprintf(response_buffer, "RST FIN %s %ld %s\n", file_name, strlen(file_data), file_data);
 
     return SUCCESS;
 }

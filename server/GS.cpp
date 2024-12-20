@@ -414,7 +414,6 @@ int handlerShowTrialsCommand(char* plid, char* response_buffer) {
 int handlerScoreboardCommand(char* response_buffer) {
 
     const char* directory = "SCORES";
-    const char* file_name = "SCOREBOARD.txt";
     char file_data[MAX_FILE_SIZE];
 
     std::cout << "antes do processScores " << std::endl;
@@ -428,7 +427,7 @@ int handlerScoreboardCommand(char* response_buffer) {
         sprintf(response_buffer, "RSS EMPTY\n");
     }
     else if(status == SUCCESS){
-        sprintf(response_buffer, "RSS OK SCOREBOARD.txt %ld %s", strlen(file_data), file_data);
+        sprintf(response_buffer, "RSS OK SCOREBOARD.txt %ld %s\n", strlen(file_data), file_data);
     }
     else {
         return ERROR;
