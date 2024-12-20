@@ -135,7 +135,7 @@ int transcriptOngoingGameFile(const char* file_path, const char* header, char* r
     
     FILE* file;
     size_t offset = 0;
-    char file_name[32], file_data[MAX_FILE_SIZE], file_tries_data[MAX_FILE_SIZE];
+    char file_name[32], file_data[MAX_FILE_SIZE], file_tries_data[MAX_FILE_SIZE/2];
 
     int plid, gameTime, trials_count = 0;
     char date[11], time[9];
@@ -187,7 +187,7 @@ int transcriptFinishedGameFile(const char* file_path, const char* header, char* 
 
     FILE* file;
     size_t offset = 0;
-    char file_name[32], file_data[MAX_FILE_SIZE], file_tries_data[MAX_FILE_SIZE];
+    char file_name[32], file_data[MAX_FILE_SIZE], file_tries_data[MAX_FILE_SIZE/2];
 
     int plid, gameTime, trials_count = 0;
     char mode, initial_date[11], initial_time[9], key_color_code[5], finisher_mode;

@@ -631,7 +631,6 @@ int main(int argc, char* argv[]) {
                 perror("Error in Select function");
                 exit(1);
             case 0:
-                printf("TIMEOUT\n");
                 break;
             default:
                 addrlen = sizeof(addr);
@@ -659,59 +658,70 @@ int main(int argc, char* argv[]) {
                     }
                 }
 
-                if(FD_ISSET(tcp_socket, &test_fd_sockets)) {
+                else if(FD_ISSET(tcp_socket, &test_fd_sockets)) {
                     int new_fd = accept(tcp_socket, (struct sockaddr*) &addr, &addrlen);
                     if(new_fd == -1) {
                         perror("TCP Socket accept error");
                         exit(1);
                     }
+                    pid_t pid = fork();
+                    if(pid == -1) {
+                        std::cerr << "ERROR: failed to fork while trying to create child process.\n";
+                        close(new_fd);
+                        exit(1);
+                    }
 
-                    ssize_t total_bytes = 0;
-                    char aux_buffer[128];
-                    memset(request_buffer, 0, sizeof(request_buffer));
+                    if(pid == 0) {
 
-                    //read from TCP Socket
-                    while(true) {
-                        memset(aux_buffer, 0, sizeof(aux_buffer));
-                        ssize_t bytes_read = read(new_fd, aux_buffer, 128);
-                        if(bytes_read < 0) {
-                            if (errno == ECONNRESET && request_buffer[total_bytes] == '\n') {
+                        ssize_t total_bytes = 0;
+                        char aux_buffer[128];
+                        memset(request_buffer, 0, sizeof(request_buffer));
+
+                        //read from TCP Socket
+                        while(true) {
+                            memset(aux_buffer, 0, sizeof(aux_buffer));
+                            ssize_t bytes_read = read(new_fd, aux_buffer, 128);
+                            if(bytes_read < 0) {
+                                if (errno == ECONNRESET && request_buffer[total_bytes] == '\n') {
+                                    break;
+                                }
+                                std::cerr << "ERROR: failed while reading from TCP connection\n";
+                                freeaddrinfo(res);
+                                close(new_fd);
+                                exit(1);
+                            }
+                            if(bytes_read == 0) {
                                 break;
                             }
-                            std::cerr << "ERROR: failed while reading from TCP connection\n";
-                            freeaddrinfo(res);
-                            close(new_fd);
-                            exit(1);
-                        }
-                        if(bytes_read == 0) {
-                            break;
-                        }
-                        strcpy(request_buffer + total_bytes, aux_buffer);
-                        total_bytes += bytes_read;
-                        if(containsChar(request_buffer, strlen(request_buffer), '\n'))
-                            break;
-                    } 
-                    printf("request: %s\n", request_buffer);
+                            strcpy(request_buffer + total_bytes, aux_buffer);
+                            total_bytes += bytes_read;
+                            if(containsChar(request_buffer, strlen(request_buffer), '\n'))
+                                break;
+                        } 
+                        printf("request: %s\n", request_buffer);
 
-                    // Resolve TCP Commands: ShowTrials and Scoreboard
-                    char response_buffer[MAX_FILE_SIZE + HEADER_SIZE];
-                    memset(response_buffer, 0, sizeof(response_buffer));
-                    resolveTCPCommands(request_buffer, response_buffer); 
-                    total_bytes = 0;
-                    // write to TCP Socket 
-                    ssize_t buffer_length = strlen(response_buffer);
-                    while(total_bytes < buffer_length) {
-                        ssize_t bytes_sent = write(new_fd, response_buffer + total_bytes, buffer_length);
-                        if(bytes_sent < 0) {
-                            std::cerr << "ERROR: failed while writing to TCP connection\n";
-                            freeaddrinfo(res);
-                            close(new_fd);
-                            exit(1);
-                        }
-                        total_bytes += bytes_sent;
-                    }         
-                    printf("response: %s\n", response_buffer);           
-                    close(new_fd);
+                        // Resolve TCP Commands: ShowTrials and Scoreboard
+                        char response_buffer[MAX_FILE_SIZE + HEADER_SIZE];
+                        memset(response_buffer, 0, sizeof(response_buffer));
+                        resolveTCPCommands(request_buffer, response_buffer); 
+                        total_bytes = 0;
+                        // write to TCP Socket 
+                        ssize_t buffer_length = strlen(response_buffer);
+                        while(total_bytes < buffer_length) {
+                            ssize_t bytes_sent = write(new_fd, response_buffer + total_bytes, buffer_length);
+                            if(bytes_sent < 0) {
+                                std::cerr << "ERROR: failed while writing to TCP connection\n";
+                                freeaddrinfo(res);
+                                close(new_fd);
+                                exit(1);
+                            }
+                            total_bytes += bytes_sent;
+                        }         
+                        printf("response: %s\n", response_buffer);           
+                        close(new_fd);
+                    } else {
+                        close(new_fd);
+                    }
                 }
         }
 
