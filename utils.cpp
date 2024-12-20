@@ -4,6 +4,9 @@
 #include <string.h>
 #include <iostream>
 #include <dirent.h>
+#include <vector>
+#include <filesystem>
+#include <bits/algorithmfwd.h>
 
 bool validPLID(const std::string& input) {
     // Verifica se tem exatamente 6 caracteres e todos são dígitos
@@ -180,6 +183,92 @@ int transcriptOngoingGameFile(const char* file_path, const char* header, char* r
     return SUCCESS;
 }
 
+int transcriptFinishedGameFile(const char* file_path, const char* header, char* response_buffer) {
+
+    FILE* file;
+    size_t offset = 0;
+    char file_name[32], file_data[MAX_FILE_SIZE], file_tries_data[MAX_FILE_SIZE];
+
+    int plid, gameTime, trials_count = 0;
+    char mode, initial_date[11], initial_time[9], key_color_code[5], finisher_mode;
+
+    sscanf(header, "%d %c %4s %03d %s %s", &plid, &mode, key_color_code, &gameTime, initial_date, initial_time);
+
+    memset(file_name, 0, sizeof(file_name));
+    sprintf(file_name, "STATE_%d.txt", plid);
+
+    finisher_mode = file_path[strlen(file_path) - 5];
+
+    file = fopen(file_path, "r");
+    if(!file) {
+        return ERROR;   
+    }
+    char line[64];
+    memset(line, 0, sizeof(line));
+    if(fgets(line, HEADER_SIZE, file) == NULL) {
+        return ERROR;
+    }
+    char color_code[COLOR_CODE_SIZE];
+    int nB, nW, try_time;
+    memset(line, 0, sizeof(line));
+    memset(file_tries_data, 0, sizeof(file_tries_data));
+    while(fgets(line, HEADER_SIZE, file)) {
+        printf("char: %c\n", line[0]);
+        if (line[0] == 'T') {
+            sscanf(line, "T: %4s %d %d %d", color_code, &nB, &nW, &try_time);
+            offset += sprintf(file_tries_data + offset, "Trial: %s, nB: %d\tnW: %d at %d sec\n", color_code, nB, nW, try_time);
+            trials_count++;
+        }
+        else {
+            break;
+        }
+    }
+
+    fclose(file);
+
+    char final_date[11], final_time[9];
+    int game_duration;
+
+    sscanf(line, "%s %s %d\n", final_date, final_time, &game_duration);
+
+    offset = 0;
+    memset(file_data, 0, sizeof(file_data));
+    offset += sprintf(file_data + offset, "--------------------------------\nLast finalized game found: ");
+    offset += sprintf(file_data + offset, "PLAYER %d\n\nGame initiated: %s %s\nTime to complete: %d seconds\n", plid, initial_date, initial_time, gameTime);
+    if(mode == 'P') {
+        offset += sprintf(file_data + offset, "Mode: PLAY\nSecret code: %s\n\n", key_color_code);
+    }
+    else {
+        offset += sprintf(file_data + offset, "Mode: DEBUG\nSecret code: %s\n\n", key_color_code);
+    }
+    if(trials_count == 0) {
+        offset += sprintf(file_data + offset, "\n\tNO TRANSACTIONS FOUND\n");
+    }
+    else {
+        offset += sprintf(file_data + offset, "\n\tTRANSACTIONS FOUND: %d\n\n", trials_count);
+    }
+
+    offset += sprintf(file_data + offset, "%s\n\n", file_tries_data);
+
+    if(finisher_mode == 'W') {
+        offset += sprintf(file_data + offset, "Termination: WIN ");
+    }
+    else if(finisher_mode == 'T') {
+        offset += sprintf(file_data + offset, "Termination: TIMEOUT ");
+    }
+    else if(finisher_mode == 'Q') {
+        offset += sprintf(file_data + offset, "Termination: QUIT ");
+    }
+    else if(finisher_mode == 'F')
+        offset += sprintf(file_data + offset, "Termination: FAIL ");
+
+    offset += sprintf(file_data + offset, "at %s %s\nGame Duration: %d seconds\n--------------------------------\n", final_date, final_time, game_duration);
+    sprintf(response_buffer, "RST FIN %s %ld %s", file_name, strlen(file_data), file_data);
+
+    return SUCCESS;
+}
+
+
 int FindLastGame(char *PLID, char *fname) {
 
     struct dirent **filelist;
@@ -212,9 +301,97 @@ int FindLastGame(char *PLID, char *fname) {
 }
 
 
+
+int processScores(const char* directory, char* file_data) {
+    
+    DIR* dir;
+    struct dirent* entry;
+    FileInfo topFiles[10] = {};
+
+    // Abrir a diretoria
+
+    dir = opendir(directory);
+    if (!dir) {
+        std::cerr << "ERROR: failed to open directory\n";
+        return ERROR;
+    }
+
+    // Iterar pelos ficheiros na diretoria
+    while ((entry = readdir(dir)) != nullptr) {
+        
+        char* filename = entry->d_name;
+        // Extract score
+        int score = atoi(filename);
+
+        char filepath[MAX_FILE_NAME];
+        snprintf(filepath, sizeof(filepath), "%s/%s", directory, filename);
+
+        // Verify if game should be on the Top 10 Scores
+        for (int i = 0; i < 10; ++i) {
+            if (score > topFiles[i].score) {
+                // Push the rest of the files downwards
+                for (int j = 9; j > i; --j) {
+                    topFiles[j] = topFiles[j - 1];
+                }
+                // Insert new file
+                topFiles[i].score = score;
+                strncpy(topFiles[i].filepath, filepath, MAX_FILE_NAME);
+                break;
+            }
+        }
+    }
+
+    closedir(dir);
+
+    // Read and copy to buffer the top 10 best scores
+    char line[128], transformed_line[128];
+    int offset = 0;
+
+    offset += sprintf(file_data + offset, "--------------------------------------------\n\t\tTOP 10 SCORES\n--------------------------------------------\n\n");
+    offset += sprintf(file_data + offset, "     SCORE  PLAYER   CODE  TRIALS   MODE\n\n");    
+
+    for (int i = 0; i < 10; ++i) {
+        if (topFiles[i].score == 0) 
+            continue; // No valid file was found
+
+        FILE* input = fopen(topFiles[i].filepath, "r");
+        if (!input) {
+            return ERROR;
+        }
+        memset(line, 0, sizeof(line));
+        if (fgets(line, sizeof(line), input)) {
+            if(i == 9)  {
+                offset += sprintf(file_data + offset, " %d - ", i + 1);
+            }
+            else {  
+                offset += sprintf(file_data + offset, "  %d - ", i + 1);
+            }
+            transcriptGameScoreFile(line, transformed_line);
+            offset += sprintf(file_data + offset, "%s", transformed_line);
+        }
+        fclose(input);
+    }
+    
+    std::cout << "acabou de processar o buffer\n\n";
+
+    return SUCCESS;
+
+} 
+
+
+
 int calculateGameScore(int game_duration, int tries_count) {
     return int((600 - game_duration) * 50/600 + (8 - tries_count) * 50 / (8-1));
 }
+
+void transcriptGameScoreFile(const char* line, char* transformed_line) {
+    
+    int score, plid, n_tries;
+    char color_code[5], mode[8];
+    sscanf(line, "%d %d %s %d %s\n", &score, &plid, color_code, &n_tries, mode);
+    sprintf(transformed_line, "%03d   %06d   %s     %d     %s\n", score, plid, color_code, n_tries, mode);
+
+}   
 
     
     

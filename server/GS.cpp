@@ -248,21 +248,33 @@ int handlerStartCommand(const char* plid, const char* max_playtime, const char* 
 
 int makeNewTrial (const char* file_name, const char* header, const char* color_code, const char* guess, int trial_number, int* nB, int* nW) {
 
-    int verified_colors[4] = {false, false, false, false};
+    int matching_guess[4] = {false, false, false, false};
+    int matching_key[4] = {false, false, false, false};
     int game_state = GAME_ON;
 
     for (int i = 0; i < 4; i++) {
         if (guess[i] == color_code[i]) {
-            verified_colors[i] = true;
+            matching_guess[i] = true;
+            matching_key[i] = true;
             (*nB)++;
         }
     }
+    // G R Y Y
+    // Y Y G R      nB = 0  nW = 2
+    // Y R G Y      nB = 2  nW = 1
+    // Y Y O G      nB = 0  nW = 2
+
     for (int i = 0; i < 4; i++) {
-        if (!verified_colors[i]) {
+        if (!matching_guess[i]) {
             for(int j = 0; j < 4; j++) {
-                if (i != j && !verified_colors[j] && guess[i] == color_code[j]) {
+                if (i != j && !matching_key[j] && guess[i] == color_code[j]) {
                     (*nW)++;
-                    verified_colors[j] = true;
+                    std::cout << "guess"<< guess[i] << "->> ind: "<< i << "\n";
+                    std::cout << "key"<< color_code[j] << "->> ind: "<< j << "\n";
+                    //printf("guess:%s ->> ind: %d", guess[i], i);
+                    //printf("key:%s ->> ind: %d", color_code[j], j);
+                    matching_guess[i] = true;
+                    matching_key[j] = true;
                     break;
                 }
             }
@@ -274,7 +286,6 @@ int makeNewTrial (const char* file_name, const char* header, const char* color_c
     else if (trial_number == 8){    // no more tries available
         game_state = GAME_END;
     }
-
 
     char trial_line[128];
     memset(trial_line, 0, sizeof(trial_line));
@@ -377,7 +388,7 @@ int handlerShowTrialsCommand(char* plid, char* response_buffer) {
         return ERROR;
     }
     memset(file_name, 0, sizeof(file_name));
-    sprintf(file_name, "GAMES/GAME_%s.txt", plid);
+    sprintf(file_name, "GAMES/GAME_%s.txt", plid); 
     if(getGameHeader(file_name, header) != ERROR) {
         if(!timeExceeded(header)) {
             transcriptOngoingGameFile(file_name, header, response_buffer);
@@ -394,7 +405,33 @@ int handlerShowTrialsCommand(char* plid, char* response_buffer) {
     else {
         // a finished game was found
         getGameHeader(file_name, header);
-        //transcriptFinishedGameFile(file_path, header, response_buffer);
+        transcriptFinishedGameFile(file_name, header, response_buffer);
+    }
+    return SUCCESS;
+}
+
+
+int handlerScoreboardCommand(char* response_buffer) {
+
+    const char* directory = "SCORES";
+    const char* file_name = "SCOREBOARD.txt";
+    char file_data[MAX_FILE_SIZE];
+
+    std::cout << "antes do processScores " << std::endl;
+
+    memset(file_data, 0, MAX_FILE_SIZE);
+    int status = processScores(directory, file_data);
+
+    std::cout << "saiu do processScores\t\tstatus:" << status << std::endl;
+
+    if (status == EMPTY){
+        sprintf(response_buffer, "RSS EMPTY\n");
+    }
+    else if(status == SUCCESS){
+        sprintf(response_buffer, "RSS OK SCOREBOARD.txt %ld %s", strlen(file_data), file_data);
+    }
+    else {
+        return ERROR;
     }
     return SUCCESS;
 }
@@ -404,8 +441,6 @@ int handlerShowTrialsCommand(char* plid, char* response_buffer) {
 int resolveUDPCommands(const char* input, char* response_buffer) {
     int num_args;
     char cmd[32], arg1[32], arg2[32], arg3[32], arg4[32], arg5[32], arg6[32];
-
-
 
 
     num_args = sscanf(input, "%s %s %s %s %s %s %s\n", cmd, arg1, arg2, arg3, arg4, arg5, arg6);
@@ -474,9 +509,9 @@ int resolveTCPCommands(const char* input, char* response_buffer) {
     printf("num_args: %d",num_args);
     switch(num_args) {
         case 1:
-            if(!strcmp(cmd, "SSB"))
-                //handlerScoreboardCommand(response_buffer);
-                ;
+            if(!strcmp(cmd, "SSB")) {
+                handlerScoreboardCommand(response_buffer);
+            }       
             else if(!strcmp(cmd, "STR"))
                 sprintf(response_buffer, "RST NOK\n");
             else {
@@ -657,6 +692,8 @@ int main(int argc, char* argv[]) {
                         if(containsChar(request_buffer, strlen(request_buffer), '\n'))
                             break;
                     } 
+                    printf("request: %s\n", request_buffer);
+
                     // Resolve TCP Commands: ShowTrials and Scoreboard
                     char response_buffer[MAX_FILE_SIZE + HEADER_SIZE];
                     memset(response_buffer, 0, sizeof(response_buffer));
@@ -673,7 +710,8 @@ int main(int argc, char* argv[]) {
                             exit(1);
                         }
                         total_bytes += bytes_sent;
-                    }                    
+                    }         
+                    printf("response: %s\n", response_buffer);           
                     close(new_fd);
                 }
         }

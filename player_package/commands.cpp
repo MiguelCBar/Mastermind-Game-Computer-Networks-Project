@@ -169,7 +169,6 @@ int commandShowTrials(const char* sv_ip, const char* port, const char* plid) {
     while(true) {
         memset(aux_buffer, 0, sizeof(aux_buffer));
         ssize_t bytes_read = read(fd, aux_buffer, max_size);
-        //printf("aux-buffer: %s\t, bytes_read: %ld\n", aux_buffer, bytes_read);
         if(bytes_read < 0) {
             if (errno == ECONNRESET && response_buffer[total_bytes] == '\n') {
                 break;
@@ -310,7 +309,7 @@ int commandScoreboard(const char* sv_ip, const char* port) {
         total_bytes += bytes_read;
     }
     int offset = 0;
-    sscanf(response_buffer, "%s %s %s %ld%n", cmd, status, file_name, &file_size, &offset);
+    sscanf(response_buffer, "%s %s %s %ld %n", cmd, status, file_name, &file_size, &offset);
 
     // create a file to store the information of the game and read the rest
     // of the file, if needed
@@ -685,7 +684,7 @@ int commandDebug(const char* sv_ip, const char* port, const char* plid, const ch
                 return_value = ERROR;
             }
             else if(!strcmp(status, "OK")) {
-                std::cout << "New game started in debug mode (max " << max_playtime <<"sec).\n";
+                std::cout << "New game started in debug mode (max " << max_playtime <<" sec).\n";
                 return_value = SUCCESS;
             }
             else if(!!strcmp(status, "ERR")) {
