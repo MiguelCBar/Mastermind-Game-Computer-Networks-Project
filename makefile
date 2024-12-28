@@ -15,8 +15,15 @@ GS_SRC = server/GS.cpp
 PLAYER_OBJ = player_package/player.o player_package/commands.o utils.o
 GS_OBJ = server/GS.o utils.o
 
+# Directories to create
+directories = player_package/games player_package/scoreboards SCORES GAMES
+
 # Default target to build all executables
-all: $(TARGETS)
+all: create_dirs $(TARGETS)
+
+# Rule to create required directories
+create_dirs:
+	@mkdir -p $(directories)
 
 # Rule to build the 'player' executable
 player: $(PLAYER_OBJ)
@@ -46,5 +53,13 @@ clean:
 lclean:
 	rm -f $(PLAYER_OBJ) $(GS_OBJ) $(TARGETS) *.txt
 
+# Rule to empty directories
+empty_dirs:
+	@for dir in $(directories); do \
+		if [ -d $$dir ]; then \
+			rm -rf $$dir/*; \
+		fi; \
+	done
+
 # Specify phony targets
-.PHONY: all clean
+.PHONY: all clean create_dirs empty_dirs
