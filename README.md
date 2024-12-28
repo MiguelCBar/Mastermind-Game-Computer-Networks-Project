@@ -13,7 +13,7 @@ The Mastermind Game is a game where players attempt to guess a randomly generate
    - **TCP**: Used for transmitting text files, ensuring no data loss.  
 
 2. **Concurrency**:  
-   - The server uses `fork` to create multiple processes, enabling simultaneous handling of multiple players without delays.  
+   - The server uses `fork` to create multiple processes for TCP commands, enabling simultaneous handling of multiple players without delays.  
 
 ## How to Compile and Run  
 
